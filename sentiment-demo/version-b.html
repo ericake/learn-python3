@@ -1,0 +1,394 @@
+<title>声眼 · 卡片流版</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;700&family=Outfit:wght@500;600&display=swap">
+<style>
+/* 布局：居中单栏（最宽 760px），顶部品牌 + 分段导航；手机端改为底部标签栏，表单用底部抽屉 */
+:root {
+  --bg: #f2f7fb;
+  --surface: #ffffff;
+  --sunk: #e8f0f7;
+  --line: #dbe6ef;
+  --fg: #18263a;
+  --muted: #64758a;
+  --accent: #2f7fd8;
+  --accent-soft: #e3effc;
+  --neg: #e2534a;
+  --neg-soft: #fdecea;
+  --pos: #23a17a;
+  --pos-soft: #e1f5ee;
+  --neu: #8090a3;
+  --neu-soft: #edf1f5;
+  --xhs: #ff2e4d;
+  --dy: #18263a;
+  --bili: #0a9fd4;
+  --wb: #f08a1c;
+  --f-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --f-num: "Outfit", "Noto Sans SC", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f1722; --surface: #172131; --sunk: #1d293b; --line: #263448; --fg: #e4ecf5; --muted: #8fa1b6;
+    --accent: #69a9f2; --accent-soft: #1b2e48; --neg: #f27a72; --neg-soft: #3a2226; --pos: #4fc79e; --pos-soft: #17342b;
+    --neu: #9aa9ba; --neu-soft: #212c3b; --dy: #e4ecf5; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f1722; --surface: #172131; --sunk: #1d293b; --line: #263448; --fg: #e4ecf5; --muted: #8fa1b6;
+  --accent: #69a9f2; --accent-soft: #1b2e48; --neg: #f27a72; --neg-soft: #3a2226; --pos: #4fc79e; --pos-soft: #17342b;
+  --neu: #9aa9ba; --neu-soft: #212c3b; --dy: #e4ecf5; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 14px; line-height: 1.6; padding-inline: 16px; padding-block: 0 96px; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wrap { max-width: 760px; margin: 0 auto; }
+
+.top { display: flex; align-items: center; gap: 16px; padding-block: 18px; flex-wrap: wrap; }
+.brand { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 17px; }
+.brand-mark { width: 26px; height: 26px; border-radius: 50%; background: radial-gradient(circle at 50% 50%, var(--surface) 0 4px, var(--accent) 5px 8px, var(--accent-soft) 9px); }
+.tabs { margin-left: auto; display: inline-flex; background: var(--sunk); border-radius: 999px; padding: 3px; }
+.tabs button { border: 0; background: none; padding: 5px 16px; border-radius: 999px; color: var(--muted); font-size: 13px; }
+.tabs button[aria-current="page"] { background: var(--surface); color: var(--fg); font-weight: 500; box-shadow: 0 1px 3px rgba(24, 38, 58, .1); }
+.bottom-tabs { display: none; }
+
+.hello { padding-block: 8px 18px; }
+.hello h1 { margin: 0; font-size: 24px; font-weight: 700; line-height: 1.35; text-wrap: balance; }
+.hello h1 em { font-style: normal; color: var(--neg); font-family: var(--f-num); }
+.hello p { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+.hello .tag { display: inline-block; font-size: 11px; letter-spacing: .04em; border: 1px dashed var(--line); border-radius: 6px; padding: 0 6px; margin-left: 6px; }
+
+.scroller { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; margin-bottom: 10px; scrollbar-width: none; }
+.scroller::-webkit-scrollbar { display: none; }
+.chipbtn { flex: none; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 5px 14px; font-size: 13px; color: var(--muted); }
+.chipbtn[aria-pressed="true"] { background: var(--accent); border-color: var(--accent); color: #fff; }
+.chipbtn .n { font-family: var(--f-num); margin-left: 4px; opacity: .8; }
+.subfilters { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; margin-bottom: 14px; font-size: 13px; color: var(--muted); }
+.subfilters button { border: 0; background: none; padding: 2px 0; color: var(--muted); border-bottom: 2px solid transparent; }
+.subfilters button[aria-pressed="true"] { color: var(--fg); border-color: var(--accent); }
+.subfilters .sep { width: 1px; height: 14px; background: var(--line); }
+.subfilters .right { margin-left: auto; }
+.textbtn { border: 0; background: none; color: var(--accent); padding: 2px 4px; font-size: 13px; }
+
+.cards { display: flex; flex-direction: column; gap: 12px; }
+.card { background: var(--surface); border-radius: 16px; padding: 16px 18px; border: 1px solid var(--line); min-width: 0; }
+.card.neg { border-color: color-mix(in srgb, var(--neg) 35%, var(--line)); }
+.card.done { opacity: .6; }
+.c-head { display: flex; align-items: center; gap: 10px; }
+.badge { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: #fff; font-size: 13px; font-weight: 700; flex: none; }
+.b-xhs { background: var(--xhs); } .b-dy { background: var(--dy); color: var(--bg); } .b-bili { background: var(--bili); } .b-wb { background: var(--wb); }
+.who { min-width: 0; }
+.who b { font-weight: 500; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.who small { color: var(--muted); font-size: 12px; }
+.mood { margin-left: auto; font-size: 12px; font-weight: 500; display: inline-flex; align-items: center; gap: 5px; flex: none; }
+.mood::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.mood.neg { color: var(--neg); } .mood.pos { color: var(--pos); } .mood.neu { color: var(--neu); }
+.card h3 { margin: 12px 0 2px; font-size: 15px; font-weight: 500; }
+.card .body { margin: 6px 0 0; color: var(--fg); opacity: .82; }
+.card h3 + .body { margin-top: 2px; }
+mark { background: none; color: var(--accent); font-weight: 500; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.tag2 { font-size: 12px; background: var(--sunk); color: var(--muted); border-radius: 6px; padding: 1px 8px; }
+.tag2.alert { background: var(--neg-soft); color: var(--neg); }
+.c-foot { display: flex; align-items: center; gap: 16px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); flex-wrap: wrap; }
+.c-foot .n { font-family: var(--f-num); color: var(--fg); font-variant-numeric: tabular-nums; }
+.c-foot .acts { margin-left: auto; display: flex; gap: 2px; flex-wrap: wrap; }
+.c-foot .acts button, .c-foot .acts a { border: 0; background: none; color: var(--muted); font-size: 12px; padding: 4px 8px; border-radius: 8px; text-decoration: none; }
+.c-foot .acts button:hover, .c-foot .acts a:hover { background: var(--sunk); color: var(--fg); }
+.c-foot .acts .main { color: var(--accent); }
+.empty { text-align: center; padding: 56px 16px; color: var(--muted); background: var(--surface); border-radius: 16px; border: 1px dashed var(--line); }
+
+.sect-title { display: flex; align-items: baseline; gap: 10px; margin: 6px 0 12px; }
+.sect-title h2 { margin: 0; font-size: 18px; }
+.sect-title span { color: var(--muted); font-size: 12px; }
+.sect-title .primary { margin-left: auto; }
+.primary { border: 0; background: var(--accent); color: #fff; border-radius: 999px; padding: 7px 18px; font-size: 13px; font-weight: 500; }
+.primary:disabled { opacity: .45; cursor: not-allowed; }
+.ghost { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 6px 16px; font-size: 13px; }
+.kw-row { display: flex; gap: 14px; align-items: flex-start; }
+.kw-row .info { flex: 1; min-width: 0; }
+.kw-row h3 { margin: 0; font-size: 15px; font-weight: 500; }
+.kw-row .words { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; }
+.w { font-size: 12px; border-radius: 6px; padding: 1px 8px; background: var(--accent-soft); color: var(--accent); }
+.w.ex { background: var(--neu-soft); color: var(--neu); }
+.w.ex::before { content: "排除 "; opacity: .7; }
+.kw-row .line { margin-top: 8px; font-size: 12px; color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.d-xhs { background: var(--xhs); } .d-dy { background: var(--dy); } .d-bili { background: var(--bili); } .d-wb { background: var(--wb); }
+.toggle { position: relative; width: 40px; height: 24px; border-radius: 999px; border: 0; background: var(--line); flex: none; }
+.toggle::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+.toggle[aria-checked="true"] { background: var(--pos); }
+.toggle[aria-checked="true"]::after { left: 19px; }
+
+.group-list { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; margin-bottom: 20px; }
+.gl-title { font-size: 12px; color: var(--muted); letter-spacing: .04em; margin: 0 0 8px 4px; }
+.gl-item { display: flex; align-items: center; gap: 12px; padding: 13px 16px; border-top: 1px solid var(--line); }
+.gl-item:first-child { border-top: 0; }
+.gl-item .txt { min-width: 0; flex: 1; }
+.gl-item small { display: block; font-size: 12px; color: var(--muted); }
+.ava { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent); font-weight: 500; flex: none; }
+.role { font-size: 12px; color: var(--muted); }
+.field { border: 1px solid var(--line); background: var(--bg); border-radius: 10px; padding: 8px 12px; font-size: 14px; width: 100%; }
+.time { width: auto; padding: 4px 8px; }
+
+.scrim { position: fixed; inset: 0; background: rgba(15, 23, 34, .4); z-index: 10; display: flex; align-items: flex-end; justify-content: center; }
+.sheet { background: var(--surface); width: 100%; max-width: 560px; border-radius: 20px 20px 0 0; padding: 10px 20px calc(20px + env(safe-area-inset-bottom, 0px)); max-height: 90%; overflow-y: auto; }
+.sheet .grip { width: 40px; height: 4px; border-radius: 4px; background: var(--line); margin: 0 auto 14px; }
+.sheet h2 { margin: 0 0 14px; font-size: 18px; }
+.sheet form { display: grid; gap: 12px; }
+.sheet label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.plats { display: flex; gap: 8px; flex-wrap: wrap; }
+.plats label { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; color: var(--fg); font-size: 13px; border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; }
+.sheet .err { color: var(--neg); font-size: 12px; min-height: 1em; }
+.sheet .acts { display: flex; gap: 8px; justify-content: flex-end; }
+.wx { background: var(--sunk); border-radius: 12px; padding: 14px; display: grid; gap: 4px; font-size: 13px; }
+.wx b { color: var(--neg); }
+.wx a { color: var(--accent); }
+.toast { position: fixed; left: 50%; bottom: calc(84px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 8px 18px; border-radius: 999px; font-size: 13px; z-index: 30; white-space: nowrap; max-width: calc(100% - 32px); overflow: hidden; text-overflow: ellipsis; }
+
+@media (max-width: 640px) {
+  .top .tabs { display: none; }
+  .bottom-tabs { display: flex; position: fixed; left: 0; right: 0; bottom: 0; background: var(--surface); border-top: 1px solid var(--line); padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px)); z-index: 5; }
+  .bottom-tabs button { flex: 1; border: 0; background: none; padding: 6px 0; color: var(--muted); font-size: 12px; display: grid; justify-items: center; gap: 2px; }
+  .bottom-tabs button::before { content: ""; width: 20px; height: 3px; border-radius: 3px; background: transparent; }
+  .bottom-tabs button[aria-current="page"] { color: var(--accent); font-weight: 500; }
+  .bottom-tabs button[aria-current="page"]::before { background: var(--accent); }
+  .hello h1 { font-size: 20px; }
+  .subfilters .right { margin-left: 0; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span>声眼</div>
+    <nav class="tabs" aria-label="主导航">
+      <button data-page="feed">信息流</button><button data-page="keywords">关键词</button><button data-page="settings">设置</button>
+    </nav>
+  </header>
+  <main id="main"></main>
+</div>
+<nav class="bottom-tabs" aria-label="主导航（手机）">
+  <button data-page="feed">信息流</button><button data-page="keywords">关键词</button><button data-page="settings">设置</button>
+</nav>
+<div id="layer"></div>
+
+<script>
+const PLATS = { xhs: '小红书', dy: '抖音', bili: 'B站', wb: '微博' };
+const SHORT = { xhs: '红', dy: '抖', bili: 'B', wb: '微' };
+const SENT = { neg: '负面', neu: '中性', pos: '正面' };
+
+const groups = [
+  { id: 'g1', name: '品牌词', words: ['山岚咖啡', '山岚', 'Shanlan Coffee'], exclude: ['山岚雾气', '山岚摄影'], plats: ['xhs', 'dy', 'bili', 'wb'], on: true },
+  { id: 'g2', name: '产品词', words: ['冷萃挂耳', '燕麦拿铁', '山岚冷萃'], exclude: ['自制冷萃教程'], plats: ['xhs', 'dy', 'wb'], on: true },
+  { id: 'g3', name: '门店服务', words: ['山岚 门店', '山岚 外卖', '山岚 店员'], exclude: [], plats: ['xhs', 'dy', 'wb'], on: true }
+];
+const posts = [
+  { id: 1, plat: 'xhs', g: 'g2', author: '早八续命研究所', time: '10:42', title: '避雷！冷萃挂耳这批喝出一股酸败味', body: '上周买的山岚冷萃挂耳，拆了三包都有怪味，客服说是正常风味……真的不是变质吗？', kw: '冷萃挂耳', sent: 'neg', likes: 1832, cmts: 412, shares: 96, alerted: true, similar: 3 },
+  { id: 2, plat: 'wb', g: 'g3', author: '城市夜跑的阿凯', time: '10:15', title: '', body: '山岚 外卖送到撒了一半，联系门店说不归他们管，平台又说找商家，踢皮球。', kw: '山岚 外卖', sent: 'neg', likes: 236, cmts: 88, shares: 41, alerted: true, similar: 0 },
+  { id: 3, plat: 'dy', g: 'g2', author: '咖啡师小周', time: '09:58', title: '燕麦拿铁盲测：五个品牌谁最顺滑？', body: '这期盲测了五款燕麦拿铁，山岚的奶感最足，甜度也刚好，第二名。', kw: '燕麦拿铁', sent: 'pos', likes: 12400, cmts: 960, shares: 1300, alerted: false, similar: 0 },
+  { id: 4, plat: 'bili', g: 'g1', author: '数码与生活', time: '09:31', title: '一周办公室咖啡挑战 Day3', body: '今天喝的是山岚的冷萃，包装挺好看，味道中规中矩。', kw: '山岚', sent: 'neu', likes: 860, cmts: 57, shares: 12, alerted: false, similar: 0 },
+  { id: 5, plat: 'xhs', g: 'g3', author: 'momo在上海', time: '09:12', title: '静安这家山岚门店太出片了', body: '二楼靠窗位置阳光很好，店员会主动推荐豆子，打卡推荐！', kw: '山岚 门店', sent: 'pos', likes: 3120, cmts: 204, shares: 88, alerted: false, similar: 0 },
+  { id: 6, plat: 'wb', g: 'g1', author: '消费观察员', time: '08:47', title: '', body: '有网友反映山岚咖啡会员积分突然清零，官方暂未回应，大家有遇到吗？', kw: '山岚咖啡', sent: 'neg', likes: 640, cmts: 301, shares: 155, alerted: true, similar: 5 },
+  { id: 7, plat: 'dy', g: 'g3', author: '探店的胖虎', time: '08:20', title: '工作日早上的山岚门店排队实录', body: '排了二十分钟，店员一直在道歉，出杯速度确实慢了点。', kw: '山岚 门店', sent: 'neg', likes: 2210, cmts: 330, shares: 47, alerted: false, similar: 0 },
+  { id: 8, plat: 'bili', g: 'g2', author: '豆子实验室', time: '昨天 22:10', title: '冷萃挂耳到底是不是智商税？拆了 6 个品牌', body: '山岚冷萃的研磨度最均匀，萃取率也最稳定，性价比不错。', kw: '冷萃挂耳', sent: 'pos', likes: 5400, cmts: 610, shares: 220, alerted: false, similar: 0 },
+  { id: 9, plat: 'xhs', g: 'g2', author: '奶茶咖啡不分家', time: '昨天 20:33', title: '燕麦拿铁是新的拿铁吗', body: '最近喝了山岚、隔壁几家的燕麦拿铁，记录一下口感差异。', kw: '燕麦拿铁', sent: 'neu', likes: 420, cmts: 36, shares: 5, alerted: false, similar: 0 },
+  { id: 10, plat: 'wb', g: 'g1', author: '小米粥今天加班', time: '昨天 18:05', title: '', body: '下午靠山岚咖啡续命成功，今天也是打工人。', kw: '山岚咖啡', sent: 'neu', likes: 18, cmts: 2, shares: 0, alerted: false, similar: 0 }
+].map(p => ({ ...p, done: false, irrelevant: false }));
+const members = [
+  { name: '林晓', role: '管理员', phone: '138****2041' },
+  { name: '周一帆', role: '成员', phone: '186****7730' },
+  { name: '陈默', role: '成员', phone: '139****5512' }
+];
+const channels = [
+  { id: 'wecom', name: '企业微信群机器人', addr: 'webhook …a83f', on: true },
+  { id: 'feishu', name: '飞书群机器人', addr: '未配置', on: false },
+  { id: 'mail', name: '邮件', addr: 'pr@shanlan.example', on: true }
+];
+
+const state = { page: 'feed', group: 'all', sent: 'all', plat: 'all', showDone: false };
+try { const p = localStorage.getItem('demoB.page'); if (p) state.page = p; } catch (e) {}
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const fmt = n => n >= 10000 ? (n / 10000).toFixed(1) + '万' : String(n);
+const hl = (t, kw) => { let o = esc(t); kw.split(' ').forEach(k => { o = o.split(esc(k)).join('<mark>' + esc(k) + '</mark>'); }); return o; };
+const live = () => posts.filter(p => !p.irrelevant);
+
+function toast(msg) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = document.createElement('div'); t.className = 'toast'; t.setAttribute('role', 'status'); t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), 2200);
+}
+
+function feed() {
+  const all = live();
+  const neg = all.filter(p => p.sent === 'neg');
+  const open = neg.filter(p => !p.done).length;
+  const list = all.filter(p => (state.group === 'all' || p.g === state.group)
+    && (state.sent === 'all' || p.sent === state.sent)
+    && (state.plat === 'all' || p.plat === state.plat)
+    && (state.showDone || !p.done));
+  const pb = (k, v, l) => `<button data-f="${k}" data-v="${v}" aria-pressed="${state[k] === v}">${l}</button>`;
+  return `
+  <section class="hello">
+    <h1>${open ? `今天有 <em>${open}</em> 条负面内容等你处理` : '负面内容都处理完了'}</h1>
+    <p>10月6日 · 共命中 ${all.length} 条 · 已推送预警 ${all.filter(p => p.alerted).length} 次 · 10:50 更新<span class="tag">示例数据</span></p>
+  </section>
+  <div class="scroller" role="group" aria-label="关键词组">
+    <button class="chipbtn" data-f="group" data-v="all" aria-pressed="${state.group === 'all'}">全部<span class="n">${all.length}</span></button>
+    ${groups.map(g => `<button class="chipbtn" data-f="group" data-v="${g.id}" aria-pressed="${state.group === g.id}">${esc(g.name)}<span class="n">${all.filter(p => p.g === g.id).length}</span></button>`).join('')}
+  </div>
+  <div class="subfilters">
+    ${pb('sent', 'all', '全部情感')}${pb('sent', 'neg', '负面')}${pb('sent', 'neu', '中性')}${pb('sent', 'pos', '正面')}
+    <span class="sep" aria-hidden="true"></span>
+    ${pb('plat', 'all', '全部平台')}${Object.entries(PLATS).map(([k, v]) => pb('plat', k, v)).join('')}
+    <span class="right"><label style="display:inline-flex;gap:4px;align-items:center"><input type="checkbox" id="showDone" ${state.showDone ? 'checked' : ''}>显示已处理</label>
+    <button class="textbtn" id="export">导出</button></span>
+  </div>
+  <div class="cards">${list.length ? list.map(card).join('') : '<div class="empty">这里暂时没有内容。</div>'}</div>`;
+}
+
+function card(p) {
+  const g = groups.find(x => x.id === p.g);
+  return `<article class="card ${p.sent === 'neg' ? 'neg' : ''} ${p.done ? 'done' : ''}">
+    <div class="c-head">
+      <span class="badge b-${p.plat}" aria-label="${PLATS[p.plat]}">${SHORT[p.plat]}</span>
+      <div class="who"><b>${esc(p.author)}</b><small>${PLATS[p.plat]} · ${p.time}</small></div>
+      <span class="mood ${p.sent}">${SENT[p.sent]}</span>
+    </div>
+    ${p.title ? `<h3>${hl(p.title, p.kw)}</h3>` : ''}
+    <p class="body">${hl(p.body, p.kw)}</p>
+    <div class="tags">
+      <span class="tag2">${esc(g.name)} · ${esc(p.kw)}</span>
+      ${p.alerted ? '<span class="tag2 alert">已推送预警</span>' : ''}
+      ${p.similar ? `<span class="tag2">另有 ${p.similar} 条相似</span>` : ''}
+      ${p.done ? '<span class="tag2">已处理</span>' : ''}
+    </div>
+    <div class="c-foot">
+      <span>赞 <span class="n">${fmt(p.likes)}</span></span><span>评 <span class="n">${fmt(p.cmts)}</span></span><span>转 <span class="n">${fmt(p.shares)}</span></span>
+      <div class="acts">
+        ${p.alerted ? `<button data-act="wx" data-id="${p.id}">推送详情</button>` : ''}
+        <button data-act="fix" data-id="${p.id}">纠正情感</button>
+        <button data-act="irr" data-id="${p.id}">不相关</button>
+        <button class="main" data-act="done" data-id="${p.id}">${p.done ? '撤销' : '已处理'}</button>
+      </div>
+    </div>
+  </article>`;
+}
+
+function keywords() {
+  return `
+  <div class="sect-title" style="margin-top:8px"><h2>关键词组</h2><span>${groups.length} / 3 组 · 每组最多 20 个词</span>
+    <button class="primary" data-act="newGroup" ${groups.length >= 3 ? 'disabled title="试用套餐最多 3 组"' : ''}>新建</button></div>
+  <div class="cards">
+    ${groups.map(g => `<div class="card kw-row">
+      <div class="info">
+        <h3>${esc(g.name)}</h3>
+        <div class="words">${g.words.map(w => `<span class="w">${esc(w)}</span>`).join('')}${g.exclude.map(w => `<span class="w ex">${esc(w)}</span>`).join('')}</div>
+        <div class="line">${g.plats.map(k => `<span class="dot d-${k}"></span>${PLATS[k]}`).join(' ')} · 今日命中 ${live().filter(p => p.g === g.id).length} 条 ·
+          <button class="textbtn" data-act="del" data-id="${g.id}" style="font-size:12px">删除</button></div>
+      </div>
+      <button class="toggle" role="switch" aria-checked="${g.on}" aria-label="启用 ${esc(g.name)}" data-act="tg" data-id="${g.id}"></button>
+    </div>`).join('')}
+  </div>
+  <p style="color:var(--muted);font-size:12px;margin-top:14px">监测词之间为“或”；同时包含排除词的内容会被丢弃。新建关键词组后会自动回溯近 3 天的内容。</p>`;
+}
+
+function settings() {
+  return `
+  <div class="sect-title" style="margin-top:8px"><h2>设置</h2></div>
+  <p class="gl-title">预警推送 · 负面内容命中后立即推送</p>
+  <div class="group-list">${channels.map(c => `<div class="gl-item"><div class="txt">${c.name}<small>${esc(c.addr)}</small></div>
+    <button class="toggle" role="switch" aria-checked="${c.on}" aria-label="启用 ${c.name}" data-act="ch" data-id="${c.id}"></button></div>`).join('')}
+    <div class="gl-item"><div class="txt">免打扰时段<small>时段内的预警在结束后合并推送</small></div>
+      <input class="field time" type="time" id="qs" value="23:00" aria-label="开始"> – <input class="field time" type="time" id="qe" value="08:00" aria-label="结束"></div>
+    <div class="gl-item"><div class="txt">发送一条测试预警<small>检查机器人和邮箱是否能收到</small></div><button class="ghost" data-act="test">发送</button></div>
+  </div>
+  <p class="gl-title">成员 · ${members.length} 人</p>
+  <div class="group-list">${members.map(m => `<div class="gl-item"><span class="ava">${m.name[0]}</span><div class="txt">${m.name}<small>${m.phone}</small></div><span class="role">${m.role}</span></div>`).join('')}
+    <form class="gl-item" id="inv"><input class="field" id="invPhone" inputmode="tel" placeholder="输入手机号邀请成员"><button class="primary">邀请</button></form>
+  </div>
+  <p class="gl-title">套餐</p>
+  <div class="group-list"><div class="gl-item"><div class="txt">MVP 试用 · 山岚咖啡（示例租户）<small>3 个关键词组 · 4 个平台 · 剩余 23 天</small></div></div></div>`;
+}
+
+function render() {
+  document.querySelectorAll('[data-page]').forEach(b => b.setAttribute('aria-current', b.dataset.page === state.page ? 'page' : 'false'));
+  $('#main').innerHTML = state.page === 'feed' ? feed() : state.page === 'keywords' ? keywords() : settings();
+}
+
+function sheet(html) { $('#layer').innerHTML = `<div class="scrim" data-close="1"><div class="sheet" role="dialog" aria-modal="true"><div class="grip"></div>${html}</div></div>`; const f = $('#layer input, #layer select, #layer button'); if (f) f.focus(); }
+const close = () => { $('#layer').innerHTML = ''; };
+
+document.addEventListener('click', e => {
+  if (e.target.dataset && e.target.dataset.close) return close();
+  const nav = e.target.closest('[data-page]');
+  if (nav) { state.page = nav.dataset.page; try { localStorage.setItem('demoB.page', state.page); } catch (err) {} close(); render(); window.scrollTo(0, 0); return; }
+  const f = e.target.closest('[data-f]');
+  if (f) { state[f.dataset.f] = f.dataset.v; render(); return; }
+  if (e.target.id === 'export') { toast('演示版暂不导出，正式版导出当前筛选结果'); return; }
+  const a = e.target.closest('[data-act]');
+  if (!a) return;
+  const id = a.dataset.id, act = a.dataset.act, p = posts.find(x => x.id === Number(id));
+  if (act === 'cancel') return close();
+  if (act === 'origin') { e.preventDefault(); toast('演示版不跳转原文'); return; }
+  if (act === 'irr') { p.irrelevant = true; toast('已标记不相关'); }
+  if (act === 'done') { p.done = !p.done; toast(p.done ? '已标记为已处理' : '已撤销'); }
+  if (act === 'fix') {
+    return sheet(`<h2>纠正情感</h2><p style="color:var(--muted);margin:-8px 0 14px;font-size:13px">${esc(p.body.slice(0, 36))}…</p>
+      <form id="fixForm" data-id="${p.id}"><div class="plats">${Object.entries(SENT).map(([k, v]) => `<label><input type="radio" name="s" value="${k}" ${p.sent === k ? 'checked' : ''}>${v}</label>`).join('')}</div>
+      <div class="acts"><button type="button" class="ghost" data-act="cancel">取消</button><button class="primary">保存</button></div></form>`);
+  }
+  if (act === 'wx') {
+    return sheet(`<h2>推送详情</h2><div class="wx"><b>【负面预警】${esc(groups.find(g => g.id === p.g).name)} · ${PLATS[p.plat]}</b>
+      <span>作者：${esc(p.author)}</span><span>摘录：${esc(p.body.slice(0, 40))}…</span><span>互动：赞 ${fmt(p.likes)} · 评 ${fmt(p.cmts)} · 转 ${fmt(p.shares)}</span>
+      <span><a href="#" data-act="origin">查看原文</a></span></div>
+      <p style="color:var(--muted);font-size:12px">已发送到：企业微信群机器人、邮件 · 发布后 6 分钟送达</p>
+      <div class="acts" style="display:flex;justify-content:flex-end"><button class="ghost" data-act="cancel">关闭</button></div>`);
+  }
+  if (act === 'newGroup') {
+    return sheet(`<h2>新建关键词组</h2><form id="ng">
+      <label>名称<input class="field" id="ngName" placeholder="例如：秋季新品"></label>
+      <label>监测词（用逗号分隔，最多 20 个）<input class="field" id="ngWords" placeholder="山岚 新品, 桂花拿铁"></label>
+      <label>排除词（选填）<input class="field" id="ngEx" placeholder="招聘, 转让"></label>
+      <div class="plats">${Object.entries(PLATS).map(([k, v]) => `<label><input type="checkbox" id="ng-${k}" checked>${v}</label>`).join('')}</div>
+      <div class="err" id="ngErr"></div>
+      <div class="acts"><button type="button" class="ghost" data-act="cancel">取消</button><button class="primary">开始监测</button></div></form>`);
+  }
+  if (act === 'del') { const i = groups.findIndex(g => g.id === id); toast(`已删除「${groups[i].name}」`); groups.splice(i, 1); }
+  if (act === 'tg') { const g = groups.find(x => x.id === id); g.on = !g.on; toast(g.on ? `已启用「${g.name}」` : `已暂停「${g.name}」`); }
+  if (act === 'ch') { const c = channels.find(x => x.id === id); if (c.addr === '未配置') { toast('请先填写飞书机器人地址'); return; } c.on = !c.on; }
+  if (act === 'test') { toast('测试预警已发送'); return; }
+  render();
+});
+document.addEventListener('change', e => {
+  if (e.target.id === 'showDone') { state.showDone = e.target.checked; render(); }
+  if (e.target.id === 'qs' || e.target.id === 'qe') toast(`免打扰时段：${$('#qs').value} – ${$('#qe').value}`);
+});
+document.addEventListener('submit', e => {
+  e.preventDefault();
+  const t = e.target;
+  if (t.id === 'fixForm') { const v = t.querySelector('input[name="s"]:checked').value; posts.find(p => p.id === Number(t.dataset.id)).sent = v; close(); toast('已纠正，将用于优化模型'); render(); }
+  if (t.id === 'ng') {
+    const name = $('#ngName').value.trim();
+    const words = $('#ngWords').value.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+    const ex = $('#ngEx').value.split(/[,，]/).map(s => s.trim()).filter(Boolean);
+    const plats = Object.keys(PLATS).filter(k => $('#ng-' + k).checked);
+    if (!name || !words.length) { $('#ngErr').textContent = '请填写名称和至少一个监测词。'; return; }
+    if (words.length > 20) { $('#ngErr').textContent = '每组最多 20 个监测词。'; return; }
+    if (!plats.length) { $('#ngErr').textContent = '至少选择一个平台。'; return; }
+    groups.push({ id: 'g' + Date.now(), name, words, exclude: ex, plats, on: true });
+    close(); toast(`「${name}」已开始监测，正在回溯近 3 天`); render();
+  }
+  if (t.id === 'inv') {
+    const v = $('#invPhone').value.trim();
+    if (!/^1\d{10}$/.test(v)) { toast('请输入 11 位手机号'); return; }
+    members.push({ name: '新成员', role: '成员', phone: v.slice(0, 3) + '****' + v.slice(7) });
+    toast('邀请短信已发送（演示）'); render();
+  }
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+render();
+</script>
