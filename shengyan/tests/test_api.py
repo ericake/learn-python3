@@ -6,48 +6,49 @@ from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 
 from app.crawlers.base import NoteData
+from sqlalchemy import select
+
 from app.db import session_scope, utcnow
 from app.jobs import pipeline
 from app.main import app
-from app.models import CrawlState
-from app.security import codes
+from app.config import get_settings
+from app.main import seed
+from app.models import CrawlState, KeywordGroup
 
-ADMIN = "13800000000"
 
 
 @pytest.fixture()
 def client(env):
-    codes._codes.clear()
     with TestClient(app) as c:
         yield c
 
 
-def login(c, phone=ADMIN):
-    r = c.post("/api/v1/auth/sms-code", json={"phone": phone})
-    assert r.status_code == 200, r.text
-    r = c.post("/api/v1/auth/login", json={"phone": phone, "code": r.json()["dev_code"]})
-    assert r.status_code == 200, r.text
-    return r.json()["user"]
+def test_no_login_needed(client):
+    assert client.get("/api/v1/hits").status_code == 200
+    assert client.get("/api/v1/auth/me").status_code == 404
+    assert client.get("/api/v1/users").status_code == 404
 
 
-def test_requires_login(client):
-    r = client.get("/api/v1/hits")
-    assert r.status_code == 401 and r.json()["message"] == "请先登录"
+def test_default_keyword_seeded_once(client, monkeypatch):
+    monkeypatch.setattr(get_settings(), "default_keywords", "全嘻嘻")
+    seed()
+    groups = client.get("/api/v1/keyword-groups").json()["items"]
+    assert [(g["name"], g["words"], g["platforms"]) for g in groups] == [("全嘻嘻", ["全嘻嘻"], ["xhs"])]
+    client.delete(f"/api/v1/keyword-groups/{groups[0]['id']}")
+    seed()  # 删掉后重启不会再加回来
+    assert client.get("/api/v1/keyword-groups").json()["items"] == []
 
 
-def test_login_flow_and_wrong_code(client):
-    assert client.post("/api/v1/auth/sms-code", json={"phone": "123"}).status_code == 400
-    assert client.post("/api/v1/auth/sms-code", json={"phone": "13900000000"}).status_code == 404
-    client.post("/api/v1/auth/sms-code", json={"phone": ADMIN})
-    assert client.post("/api/v1/auth/login", json={"phone": ADMIN, "code": "000000x"}).status_code == 400
-    codes._codes.clear()
-    user = login(client)
-    assert user["role"] == "admin" and user["phone"] == "138****0000"
-    assert client.get("/api/v1/auth/me").status_code == 200
+def test_default_keyword_not_added_when_groups_exist(client, monkeypatch):
+    with session_scope() as db:
+        db.add(KeywordGroup(name="已有", words=["a"], exclude_words=[], platforms=["xhs"]))
+    monkeypatch.setattr(get_settings(), "default_keywords", "全嘻嘻")
+    seed()
+    with session_scope() as db:
+        assert list(db.scalars(select(KeywordGroup.name))) == ["已有"]
 
 
 def test_keyword_group_crud_and_limits(client):
-    login(client)
     r = client.post("/api/v1/keyword-groups", json={"name": "品牌词", "words": ["山岚咖啡", " 山岚咖啡 ", "山岚"],
                                                      "exclude_words": ["山岚雾气"]})
     assert r.status_code == 201 and r.json()["words"] == ["山岚咖啡", "山岚"]
@@ -77,7 +78,6 @@ def seed_hits(env):
 
 
 def test_hits_list_filter_patch_export(client, env):
-    login(client)
     client.post("/api/v1/keyword-groups", json={"name": "产品词", "words": ["冷萃挂耳"]})
     seed_hits(env)
     items = client.get("/api/v1/hits").json()["items"]
@@ -108,7 +108,6 @@ def test_hits_list_filter_patch_export(client, env):
 
 
 def test_alert_detail_and_feedback(client, env):
-    login(client)
     client.put("/api/v1/settings/notify", json={"wecom_enabled": True,
                                                 "wecom_webhook": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=k"})
     client.post("/api/v1/keyword-groups", json={"name": "产品词", "words": ["冷萃挂耳"]})
@@ -121,7 +120,6 @@ def test_alert_detail_and_feedback(client, env):
 
 
 def test_notify_settings_validation_and_test_push(client, env):
-    login(client)
     r = client.put("/api/v1/settings/notify", json={"wecom_webhook": "https://evil.example.com/hook"})
     assert r.status_code == 400
     r = client.put("/api/v1/settings/notify", json={"feishu_enabled": True})
@@ -133,21 +131,6 @@ def test_notify_settings_validation_and_test_push(client, env):
         "quiet_enabled": True, "quiet_start": "23:00", "quiet_end": "08:00"})
     assert r.status_code == 200 and r.json()["feishu_enabled"] is True
     assert client.post("/api/v1/settings/notify/test").json()["result"] == {"feishu": "ok"}
-
-
-def test_members_and_permissions(client):
-    login(client)
-    r = client.post("/api/v1/users", json={"phone": "13900001111", "name": "周一帆"})
-    assert r.status_code == 201
-    assert client.post("/api/v1/users", json={"phone": "13900001111"}).status_code == 400
-    me = client.get("/api/v1/users").json()["me"]
-    assert client.delete(f"/api/v1/users/{me}").status_code == 400
-    client.post("/api/v1/auth/logout")
-    codes._codes.clear()
-    login(client, "13900001111")
-    r = client.post("/api/v1/keyword-groups", json={"name": "x", "words": ["x"]})
-    assert r.status_code == 403
-    assert client.get("/api/v1/keyword-groups").status_code == 200
 
 
 def test_healthz(client):

@@ -12,8 +12,8 @@ from .api.routes import router
 from .config import BASE_DIR, get_settings
 from .db import SessionLocal, init_db
 from .jobs import scheduler
-from .models import CrawlState, User
-from .settings_store import save_crawler_status
+from .models import CrawlState, KeywordGroup
+from .settings_store import get_value, save_crawler_status, save_value
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("shengyan")
@@ -22,10 +22,14 @@ STATIC_DIR = BASE_DIR / "static"
 
 def seed() -> None:
     s = get_settings()
+    words = [w.strip() for w in s.default_keywords.replace("，", ",").split(",") if w.strip()]
     with SessionLocal() as db:
-        if not db.scalar(select(func.count(User.id))):
-            db.add(User(phone=s.admin_phone, name=s.admin_name, role="admin"))
-            log.info("已创建管理员账号 %s", s.admin_phone)
+        # 只在第一次启动时创建；之后用户删掉也不会再自动加回来
+        if not get_value(db, "seed", {}).get("default_group") and words:
+            if not db.scalar(select(func.count(KeywordGroup.id))):
+                db.add(KeywordGroup(name=words[0], words=words[:s.max_words_per_group], exclude_words=[], platforms=["xhs"]))
+                log.info("已创建默认关键词组：%s", "、".join(words))
+            save_value(db, "seed", {"default_group": True})
         save_crawler_status(db, auth_failed=False, auth_error="", paused_until=None)  # 重启即重试
         db.commit()
 
@@ -33,8 +37,6 @@ def seed() -> None:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     s = get_settings()
-    if s.app_env != "dev" and (s.app_secret_key == "change-me-in-production" or len(s.app_secret_key) < 32):
-        raise RuntimeError("生产环境必须设置至少 32 位的 APP_SECRET_KEY")
     init_db()
     seed()
     log.info("数据源：%s；情感判断：%s", s.effective_crawler_mode, s.effective_sentiment_mode)

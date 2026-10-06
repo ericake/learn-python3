@@ -19,12 +19,12 @@ NOTIFY_DEFAULTS = {
 CRAWLER_DEFAULTS = {"auth_failed": False, "auth_error": "", "paused_until": None}
 
 
-def _get(db: Session, key: str, defaults: dict) -> dict:
+def get_value(db: Session, key: str, defaults: dict) -> dict:
     row = db.get(Setting, key)
     return {**defaults, **(row.value if row else {})}
 
 
-def _save(db: Session, key: str, value: dict) -> None:
+def save_value(db: Session, key: str, value: dict) -> None:
     row = db.get(Setting, key)
     if row:
         row.value = dict(value)
@@ -34,20 +34,20 @@ def _save(db: Session, key: str, value: dict) -> None:
 
 
 def get_notify(db: Session) -> dict:
-    return _get(db, "notify", NOTIFY_DEFAULTS)
+    return get_value(db, "notify", NOTIFY_DEFAULTS)
 
 
 def save_notify(db: Session, value: dict) -> dict:
     merged = {**get_notify(db), **{k: v for k, v in value.items() if k in NOTIFY_DEFAULTS}}
-    _save(db, "notify", merged)
+    save_value(db, "notify", merged)
     return merged
 
 
 def get_crawler_status(db: Session) -> dict:
-    return _get(db, "crawler", CRAWLER_DEFAULTS)
+    return get_value(db, "crawler", CRAWLER_DEFAULTS)
 
 
 def save_crawler_status(db: Session, **changes) -> dict:
     merged = {**get_crawler_status(db), **changes}
-    _save(db, "crawler", merged)
+    save_value(db, "crawler", merged)
     return merged

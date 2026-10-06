@@ -7,11 +7,11 @@
   const fmtNum = n => n >= 10000 ? (n / 10000).toFixed(1) + '万' : String(n ?? 0);
 
   const state = {
-    user: null, page: 'feed',
+    page: 'feed',
     summary: null, groups: [], limits: { max_groups: 3, max_words: 20 },
     hits: [], cursor: null, loading: false, newCount: 0,
     f: { group: '', sentiment: '', status: 'open', q: '' },
-    notify: null, users: [], editing: null, flashId: null,
+    notify: null, editing: null, flashId: null,
   };
   try { const p = localStorage.getItem('sy.page'); if (p) state.page = p; } catch (e) {}
 
@@ -24,7 +24,6 @@
     });
     let data = null;
     try { data = await res.json(); } catch (e) {}
-    if (res.status === 401 && !opts.allow401) { state.user = null; render(); throw new Error(data?.message || '请先登录'); }
     if (!res.ok) throw new Error(data?.message || `请求失败（${res.status}）`);
     return data;
   }
@@ -80,8 +79,7 @@
     } finally { state.loading = false; }
   }
   async function loadSettings() {
-    const [n, u] = await Promise.all([api('/settings/notify'), api('/users')]);
-    state.notify = n; state.users = u.items;
+    state.notify = await api('/settings/notify');
   }
 
   async function go(page) {
@@ -101,19 +99,6 @@
     }
   }
 
-  // ---------- 登录 ----------
-  function renderLogin() {
-    return `<div class="login"><form class="login-card" id="loginForm">
-      <h1><span class="logo-mark" aria-hidden="true"></span>声眼舆情监测</h1>
-      <p>用管理员邀请的手机号登录。</p>
-      <label>手机号<input class="input" id="lgPhone" inputmode="tel" autocomplete="tel" maxlength="11" placeholder="11 位手机号"></label>
-      <label>验证码<div class="code-row"><input class="input" id="lgCode" inputmode="numeric" maxlength="6" placeholder="6 位验证码" autocomplete="one-time-code">
-        <button type="button" class="btn" id="sendCode">获取验证码</button></div></label>
-      <div class="err" id="lgErr"></div>
-      <button class="btn primary">登录</button>
-    </form></div>`;
-  }
-
   // ---------- 布局 ----------
   function shell(inner) {
     const negOpen = state.summary?.neg_open_total ?? 0;
@@ -122,8 +107,7 @@
       <aside class="side">
         <div class="logo"><span class="logo-mark" aria-hidden="true"></span>声眼</div>
         <nav class="nav" aria-label="主导航">${nav('feed', '信息流')}${nav('keywords', '关键词管理')}${nav('settings', '设置')}</nav>
-        <div class="side-foot"><div class="side-user"><span>${esc(state.user.name)} · ${state.user.role === 'admin' ? '管理员' : '成员'}</span>
-          <button class="link" data-act="logout">退出</button></div>小红书 · 单租户 V1</div>
+        <div class="side-foot">小红书 · 单租户 V1<br>仅本机访问</div>
       </aside>
       <main id="main">${inner}</main></div>`;
   }
@@ -131,8 +115,7 @@
   function systemBanner() {
     const s = state.summary?.system;
     if (!s) return '';
-    const isAdmin = state.user.role === 'admin';
-    if (s.state === 'auth_failed') return `<div class="banner warn">${esc(s.message)}${isAdmin ? '<button class="btn" data-act="resume">已更换 Token，恢复采集</button>' : ''}</div>`;
+    if (s.state === 'auth_failed') return `<div class="banner warn">${esc(s.message)}<button class="btn" data-act="resume">已更换 Token，恢复采集</button></div>`;
     if (['paused', 'delayed'].includes(s.state)) return `<div class="banner warn">${esc(s.message)}</div>`;
     if (s.state === 'idle') return `<div class="banner">还没有启用的关键词组。<button class="btn" data-page="keywords">去添加关键词</button></div>`;
     if (s.state === 'starting') return `<div class="banner">正在进行首次采集，稍后刷新即可看到内容。</div>`;
@@ -213,17 +196,16 @@
 
   // ---------- 关键词 ----------
   function renderKeywords() {
-    const isAdmin = state.user.role === 'admin';
     const full = state.groups.length >= state.limits.max_groups;
     const ed = state.editing ? state.groups.find(g => g.id === state.editing) : null;
-    const formDisabled = !isAdmin || (full && !ed);
+    const formDisabled = full && !ed;
     return `
     <div class="head"><div><h1>关键词管理</h1><p>监测词之间为“或”，含空格的词要求每一段都出现；命中排除词的内容直接丢弃。新建后自动回溯近 3 天。</p></div>
       <span class="quota">已用 ${state.groups.length} / ${state.limits.max_groups} 组 · 每组最多 ${state.limits.max_words} 个词</span></div>
     ${systemBanner()}
     <div class="groups">
       ${state.groups.map(g => `<div class="card">
-        <h3>${esc(g.name)}<button class="switch" role="switch" aria-checked="${g.enabled}" aria-label="启用 ${esc(g.name)}" data-act="toggleGroup" data-id="${g.id}" ${isAdmin ? '' : 'disabled'}></button></h3>
+        <h3>${esc(g.name)}<button class="switch" role="switch" aria-checked="${g.enabled}" aria-label="启用 ${esc(g.name)}" data-act="toggleGroup" data-id="${g.id}"></button></h3>
         <div class="lbl">监测词 · ${g.words.length}/${state.limits.max_words}</div>
         <div class="chips">${g.words.map(w => `<span class="chip">${esc(w)}</span>`).join('')}</div>
         <div class="lbl">排除词</div>
@@ -231,17 +213,16 @@
         <div class="lbl">平台</div>
         <div class="chips"><span class="plat p-xhs" style="font-size:12px"><i></i>小红书</span></div>
         <div class="row-foot" style="margin-top:14px"><span>今日命中 ${g.today_hits} 条</span>
-          ${isAdmin ? `<div class="acts"><button class="link" data-act="editGroup" data-id="${g.id}">编辑</button>
-          <button class="link danger" data-act="delGroup" data-id="${g.id}">${state.confirmDel === g.id ? '确认删除？' : '删除'}</button></div>` : ''}</div>
+          <div class="acts"><button class="link" data-act="editGroup" data-id="${g.id}">编辑</button>
+          <button class="link danger" data-act="delGroup" data-id="${g.id}">${state.confirmDel === g.id ? '确认删除？' : '删除'}</button></div></div>
       </div>`).join('')}
       <form class="card" id="groupForm">
         <h3>${ed ? `编辑「${esc(ed.name)}」` : '新建关键词组'}</h3>
-        ${!isAdmin ? '<div class="readonly-note">只有管理员可以新建或修改关键词组。</div>' : ''}
         <label>名称<input class="input" id="ngName" maxlength="20" placeholder="例如：品牌词" value="${esc(ed?.name || '')}" ${formDisabled ? 'disabled' : ''}></label>
-        <label>监测词（逗号或换行分隔）<textarea class="input" id="ngWords" placeholder="山岚咖啡, 山岚 门店" ${formDisabled ? 'disabled' : ''}>${esc((ed?.words || []).join(', '))}</textarea></label>
+        <label>监测词（逗号或换行分隔）<textarea class="input" id="ngWords" placeholder="全嘻嘻, 全嘻嘻 门店" ${formDisabled ? 'disabled' : ''}>${esc((ed?.words || []).join(', '))}</textarea></label>
         <label>排除词（选填）<input class="input" id="ngEx" placeholder="招聘, 转让" value="${esc((ed?.exclude_words || []).join(', '))}" ${formDisabled ? 'disabled' : ''}></label>
         <div class="checks"><label><input type="checkbox" checked disabled>小红书</label><span class="quota">V1 仅支持小红书</span></div>
-        <div class="err" id="ngErr">${full && !ed && isAdmin ? `最多 ${state.limits.max_groups} 组，删除一组后可新建。` : ''}</div>
+        <div class="err" id="ngErr">${full && !ed ? `最多 ${state.limits.max_groups} 组，删除一组后可新建。` : ''}</div>
         <div class="inline-actions"><button class="btn primary" ${formDisabled ? 'disabled' : ''}>${ed ? '保存修改' : '保存并开始监测'}</button>
           ${ed ? '<button type="button" class="btn" data-act="cancelEdit">取消</button>' : ''}</div>
       </form>
@@ -251,37 +232,28 @@
   // ---------- 设置 ----------
   function renderSettings() {
     const n = state.notify;
-    const isAdmin = state.user.role === 'admin';
     const sys = state.summary?.system || {};
     if (!n) return `<div class="head"><div><h1>设置</h1></div></div><div class="empty">加载中…</div>`;
-    const dis = isAdmin ? '' : 'disabled';
     const chan = (key, name, field, ph, extra = '') => `<div class="ch">
       <div class="ch-head"><div>${name}<small>${extra}</small></div>
-        <button type="button" class="switch" role="switch" aria-checked="${state.notifyDraft?.[key + '_enabled'] ?? n[key + '_enabled']}" aria-label="启用 ${name}" data-act="toggleCh" data-key="${key}" ${dis}></button></div>
-      <input class="input" id="n-${key}" value="${esc(n[field])}" placeholder="${ph}" ${dis}></div>`;
+        <button type="button" class="switch" role="switch" aria-checked="${state.notifyDraft?.[key + '_enabled'] ?? n[key + '_enabled']}" aria-label="启用 ${name}" data-act="toggleCh" data-key="${key}"></button></div>
+      <input class="input" id="n-${key}" value="${esc(n[field])}" placeholder="${ph}"></div>`;
     return `
     <div class="head"><div><h1>设置</h1><p>负面内容命中后推送到已启用的渠道；同一相似内容 6 小时内只推送一次。</p></div></div>
     ${systemBanner()}
     <div class="settings">
       <form class="card" id="notifyForm">
         <h3>预警推送渠道</h3>
-        ${!isAdmin ? '<div class="readonly-note">只有管理员可以修改推送设置。</div>' : ''}
         ${chan('wecom', '企业微信群机器人', 'wecom_webhook', 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=…')}
         ${chan('feishu', '飞书群机器人', 'feishu_webhook', 'https://open.feishu.cn/open-apis/bot/v2/hook/…')}
         ${chan('email', '邮件', 'email_to', '多个邮箱用逗号分隔', n.email_configured ? '' : ' · 服务器未配置 SMTP，暂不可用')}
         <div class="ch"><div class="ch-head"><div>免打扰时段<small> · 期间的预警结束后合并推送</small></div>
-          <button type="button" class="switch" role="switch" aria-checked="${state.notifyDraft?.quiet_enabled ?? n.quiet_enabled}" aria-label="启用免打扰" data-act="toggleCh" data-key="quiet" ${dis}></button></div>
-          <div class="time-row"><input class="input" type="time" id="qStart" value="${esc(n.quiet_start)}" aria-label="开始" ${dis}><span>至</span><input class="input" type="time" id="qEnd" value="${esc(n.quiet_end)}" aria-label="结束" ${dis}></div></div>
+          <button type="button" class="switch" role="switch" aria-checked="${state.notifyDraft?.quiet_enabled ?? n.quiet_enabled}" aria-label="启用免打扰" data-act="toggleCh" data-key="quiet"></button></div>
+          <div class="time-row"><input class="input" type="time" id="qStart" value="${esc(n.quiet_start)}" aria-label="开始"><span>至</span><input class="input" type="time" id="qEnd" value="${esc(n.quiet_end)}" aria-label="结束"></div></div>
         <div class="ch"><div class="ch-head"><div>负面预警阈值<small> · 模型置信度达到该值才推送</small></div></div>
-          <div class="time-row"><input class="input" type="number" id="nThr" min="0" max="1" step="0.05" value="${n.neg_threshold}" ${dis}></div></div>
-        ${isAdmin ? `<div class="inline-actions"><button class="btn primary">保存</button><button type="button" class="btn" data-act="testPush">发送测试预警</button><span class="result" id="pushResult"></span></div>` : ''}
+          <div class="time-row"><input class="input" type="number" id="nThr" min="0" max="1" step="0.05" value="${n.neg_threshold}"></div></div>
+        <div class="inline-actions"><button class="btn primary">保存</button><button type="button" class="btn" data-act="testPush">发送测试预警</button><span class="result" id="pushResult"></span></div>
       </form>
-      <div class="card"><h3>成员 <span class="quota" style="margin-left:auto">${state.users.length} 人</span></h3>
-        <div class="list" style="margin-top:8px">${state.users.map(u => `<div class="item"><span class="avatar">${esc(u.name[0])}</span><div style="min-width:0">${esc(u.name)}<small>${esc(u.phone)}</small></div>
-          <span class="pill ${u.role === 'admin' ? 'kw' : 'neu'}" style="margin-left:auto">${u.role === 'admin' ? '管理员' : '成员'}</span>
-          ${isAdmin && u.id !== state.user.id ? `<button class="link danger" data-act="delUser" data-id="${u.id}">${state.confirmUser === u.id ? '确认移除？' : '移除'}</button>` : ''}</div>`).join('')}</div>
-        ${isAdmin ? `<form class="form-grid" id="invite" style="margin-top:12px"><div class="time-row"><input class="input" id="invName" placeholder="姓名" maxlength="20" style="width:100px"><input class="input grow" id="invPhone" inputmode="tel" maxlength="11" placeholder="手机号" style="width:auto;flex:1"><button class="btn primary">邀请</button></div></form>` : ''}
-      </div>
       <div class="card"><h3>数据源</h3>
         <div class="list" style="margin-top:8px">
           <div class="item"><div>采集状态<small>${esc(sys.message || '—')}</small></div></div>
@@ -289,7 +261,7 @@
           <div class="item"><div>情感判断<small>${sys.sentiment_mode === 'llm' ? 'DeepSeek 大模型' : '本地规则（未配置 LLM_API_KEY）'}</small></div></div>
           <div class="item"><div>监测词<small>${sys.keyword_count ?? 0} 个 · 每 ${sys.interval_min ?? 10} 分钟一轮 · 最近成功 ${sys.last_success_at ? fmtTime(sys.last_success_at) : '—'}</small></div></div>
         </div>
-        ${isAdmin ? `<div class="inline-actions" style="margin-top:12px"><button class="btn" data-act="crawlNow">立即采集一轮</button>${sys.state === 'auth_failed' || sys.state === 'paused' ? '<button class="btn" data-act="resume">恢复采集</button>' : ''}</div>` : ''}
+        <div class="inline-actions" style="margin-top:12px"><button class="btn" data-act="crawlNow">立即采集一轮</button>${sys.state === 'auth_failed' || sys.state === 'paused' ? '<button class="btn" data-act="resume">恢复采集</button>' : ''}</div>
       </div>
     </div>`;
   }
@@ -317,7 +289,6 @@
 
   // ---------- 渲染 ----------
   function render() {
-    if (!state.user) { $('#root').innerHTML = renderLogin(); return; }
     const body = state.page === 'feed' ? renderFeed() : state.page === 'keywords' ? renderKeywords() : renderSettings();
     const active = document.activeElement?.id;
     const pos = active === 'fQ' ? $('#fQ').selectionStart : null;
@@ -355,12 +326,10 @@
     if (nav) { go(nav.dataset.page); return; }
     const sg = e.target.closest('[data-seg]');
     if (sg) { state.f[sg.dataset.seg] = sg.dataset.v; render(); await loadHits().catch(fail); render(); return; }
-    if (e.target.id === 'sendCode') return sendCode(e.target);
     const a = e.target.closest('[data-act]');
     if (!a) return;
     const id = a.dataset.id, act = a.dataset.act;
     try {
-      if (act === 'logout') { await api('/auth/logout', { method: 'POST' }); state.user = null; render(); return; }
       if (act === 'refresh') { await Promise.all([loadHits(), loadSummary()]); }
       if (act === 'more') { await loadHits(false); }
       if (act === 'alert') return showAlert(id);
@@ -386,10 +355,6 @@
         if (state.confirmDel !== Number(id)) { state.confirmDel = Number(id); render(); return; }
         await api('/keyword-groups/' + id, { method: 'DELETE' }); state.confirmDel = null; toast('已删除'); await loadGroups();
       }
-      if (act === 'delUser') {
-        if (state.confirmUser !== Number(id)) { state.confirmUser = Number(id); render(); return; }
-        await api('/users/' + id, { method: 'DELETE' }); state.confirmUser = null; toast('已移除'); await loadSettings();
-      }
       if (act === 'toggleCh') {
         const key = a.dataset.key + '_enabled';
         a.setAttribute('aria-checked', String(a.getAttribute('aria-checked') !== 'true'));
@@ -409,28 +374,12 @@
     render();
   });
 
-  async function sendCode(btn) {
-    const phone = $('#lgPhone').value.trim();
-    $('#lgErr').textContent = '';
-    if (!/^1\d{10}$/.test(phone)) { $('#lgErr').textContent = '请输入 11 位手机号'; return; }
-    try {
-      const r = await api('/auth/sms-code', { method: 'POST', body: { phone }, allow401: true });
-      if (r.dev_code) { $('#lgCode').value = r.dev_code; toast('开发环境：验证码已自动填入'); } else toast('验证码已发送');
-      let n = 60; btn.disabled = true;
-      const t = setInterval(() => { btn.textContent = `${--n} 秒后重发`; if (n <= 0) { clearInterval(t); btn.disabled = false; btn.textContent = '获取验证码'; } }, 1000);
-    } catch (e) { $('#lgErr').textContent = e.message; }
-  }
-
   const splitWords = v => v.split(/[,，\n]/).map(s => s.trim()).filter(Boolean);
 
   document.addEventListener('submit', async e => {
     e.preventDefault();
     const f = e.target;
     try {
-      if (f.id === 'loginForm') {
-        const r = await api('/auth/login', { method: 'POST', body: { phone: $('#lgPhone').value.trim(), code: $('#lgCode').value.trim() }, allow401: true });
-        state.user = r.user; return go(state.page);
-      }
       if (f.id === 'groupForm') {
         const body = { name: $('#ngName').value.trim(), words: splitWords($('#ngWords').value), exclude_words: splitWords($('#ngEx').value) };
         if (!body.name || !body.words.length) { $('#ngErr').textContent = '请填写名称和至少一个监测词。'; return; }
@@ -451,15 +400,8 @@
         state.notify = await api('/settings/notify', { method: 'PUT', body }); state.notifyDraft = null;
         toast('推送设置已保存'); render(); return;
       }
-      if (f.id === 'invite') {
-        const phone = $('#invPhone').value.trim();
-        if (!/^1\d{10}$/.test(phone)) { toast('请输入 11 位手机号'); return; }
-        await api('/users', { method: 'POST', body: { phone, name: $('#invName').value.trim() || '新成员' } });
-        toast('已添加成员，对方用该手机号即可登录'); await loadSettings(); render();
-      }
     } catch (err) {
-      if (f.id === 'loginForm') $('#lgErr').textContent = err.message;
-      else if (f.id === 'groupForm') $('#ngErr').textContent = err.message;
+      if (f.id === 'groupForm') $('#ngErr').textContent = err.message;
       else fail(err);
     }
   });
@@ -468,7 +410,7 @@
 
   // 每分钟检查一次新内容和概况
   setInterval(async () => {
-    if (!state.user || document.hidden) return;
+    if (document.hidden) return;
     try {
       await loadSummary();
       if (state.page === 'feed') {
@@ -485,7 +427,6 @@
   (async () => {
     const m = location.hash.match(/^#hit-(\d+)$/);
     if (m) { state.page = 'feed'; state.f.status = 'all'; state.flashId = Number(m[1]); }
-    try { state.user = (await api('/auth/me', { allow401: true })).user; } catch (e) { state.user = null; }
-    if (state.user) go(state.page); else render();
+    go(state.page);
   })();
 })();

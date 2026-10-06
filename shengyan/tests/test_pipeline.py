@@ -144,3 +144,10 @@ def test_mock_crawler_end_to_end(env):
     env.services.crawler = MockXhsCrawler(interval_min=10)
     pipeline.run_due(env.services)
     assert count(Post) > 0 and count(Hit) > 0
+
+
+def test_mock_crawler_first_page_never_empty():
+    from app.crawlers.mock import MockXhsCrawler
+
+    page = MockXhsCrawler(interval_min=10).search("全嘻嘻")
+    assert len(page.notes) == 3 and all(n.published_at <= utcnow() for n in page.notes)

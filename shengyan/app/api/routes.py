@@ -1,4 +1,7 @@
-"""后端 API（技术文档第 7 节），前缀 /api/v1。"""
+"""后端 API（技术文档第 7 节），前缀 /api/v1。
+
+单租户本地部署，不需要登录；服务默认只监听 127.0.0.1。
+"""
 import io
 import logging
 import re
@@ -6,7 +9,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Literal
 from zoneinfo import ZoneInfo
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Response
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from openpyxl import Workbook
 from pydantic import BaseModel, Field, field_validator
@@ -18,13 +21,11 @@ from ..alerts.service import send_test
 from ..config import get_settings
 from ..db import get_db, utcnow
 from ..jobs import pipeline, scheduler
-from ..models import Alert, AlertDelivery, CrawlState, Hit, KeywordGroup, Post, User
-from ..security import COOKIE_NAME, TOKEN_TTL, admin_user, codes, current_user, make_token
+from ..models import Alert, AlertDelivery, CrawlState, Hit, KeywordGroup, Post
 from ..settings_store import get_crawler_status, get_notify, save_crawler_status, save_notify
 
 log = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1")
-PHONE_RE = re.compile(r"^1\d{10}$")
 SENTIMENTS = {"neg", "neu", "pos"}
 
 
@@ -49,57 +50,6 @@ def parse_dt(value: str | None) -> datetime | None:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=ZoneInfo(get_settings().timezone))
     return dt.astimezone(timezone.utc).replace(tzinfo=None)
-
-
-# ---------- 登录 ----------
-
-class PhoneIn(BaseModel):
-    phone: str
-
-
-class LoginIn(BaseModel):
-    phone: str
-    code: str
-
-
-def user_out(u: User) -> dict:
-    return {"id": u.id, "name": u.name, "phone": u.phone[:3] + "****" + u.phone[-4:], "role": u.role}
-
-
-@router.post("/auth/sms-code")
-def send_code(body: PhoneIn, db: Session = Depends(get_db)):
-    if not PHONE_RE.match(body.phone):
-        raise HTTPException(400, "请输入 11 位手机号")
-    if not db.scalar(select(User.id).where(User.phone == body.phone)):
-        raise HTTPException(404, "该手机号还没有被邀请，请联系管理员")
-    code = codes.issue(body.phone)
-    # V1 未接短信服务：验证码打印在服务端日志里；开发环境直接返回给前端
-    log.warning("登录验证码 %s****%s：%s", body.phone[:3], body.phone[-4:], code)
-    out = {"sent": True}
-    if get_settings().app_env == "dev":
-        out["dev_code"] = code
-    return out
-
-
-@router.post("/auth/login")
-def login(body: LoginIn, response: Response, db: Session = Depends(get_db)):
-    user = db.scalar(select(User).where(User.phone == body.phone))
-    if not user or not codes.verify(body.phone, body.code.strip()):
-        raise HTTPException(400, "验证码不正确或已过期")
-    response.set_cookie(COOKIE_NAME, make_token(user), max_age=int(TOKEN_TTL.total_seconds()),
-                        httponly=True, samesite="lax", secure=get_settings().app_env != "dev")
-    return {"user": user_out(user)}
-
-
-@router.post("/auth/logout")
-def logout(response: Response):
-    response.delete_cookie(COOKIE_NAME)
-    return {"ok": True}
-
-
-@router.get("/auth/me")
-def me(user: User = Depends(current_user)):
-    return {"user": user_out(user)}
 
 
 # ---------- 概况与系统状态 ----------
@@ -128,7 +78,7 @@ def system_status(db: Session) -> dict:
 
 
 @router.get("/summary")
-def summary(user: User = Depends(current_user), db: Session = Depends(get_db)):
+def summary(db: Session = Depends(get_db)):
     start = local_day_start_utc()
     base = select(Hit).join(Post).where(Hit.is_irrelevant.is_(False), Post.published_at >= start)
     eff = func.coalesce(Hit.sentiment_manual, Hit.sentiment)
@@ -144,12 +94,12 @@ def summary(user: User = Depends(current_user), db: Session = Depends(get_db)):
 
 
 @router.get("/system/status")
-def get_system_status(user: User = Depends(current_user), db: Session = Depends(get_db)):
+def get_system_status(db: Session = Depends(get_db)):
     return system_status(db)
 
 
 @router.post("/system/crawler/resume")
-def resume_crawler(user: User = Depends(admin_user), db: Session = Depends(get_db)):
+def resume_crawler(db: Session = Depends(get_db)):
     save_crawler_status(db, auth_failed=False, auth_error="", paused_until=None)
     db.commit()
     scheduler.trigger_now()
@@ -157,7 +107,7 @@ def resume_crawler(user: User = Depends(admin_user), db: Session = Depends(get_d
 
 
 @router.post("/system/crawl-now")
-def crawl_now(user: User = Depends(admin_user)):
+def crawl_now():
     scheduler.trigger_now()
     return {"ok": True}
 
@@ -213,7 +163,7 @@ def list_hits(group_id: int | None = None, sentiment: Literal["neg", "neu", "pos
               status: Literal["open", "done", "all"] = "open", q: str | None = Query(None, max_length=50),
               date_from: str | None = Query(None, alias="from"), date_to: str | None = Query(None, alias="to"),
               cursor: int | None = None, limit: int = Query(20, ge=1, le=50),
-              user: User = Depends(current_user), db: Session = Depends(get_db)):
+              db: Session = Depends(get_db)):
     stmt = hit_query(db, group_id, sentiment, status, q, parse_dt(date_from), parse_dt(date_to))
     if cursor:
         stmt = stmt.where(Hit.id < cursor)
@@ -226,7 +176,7 @@ def list_hits(group_id: int | None = None, sentiment: Literal["neg", "neu", "pos
 def export_hits(group_id: int | None = None, sentiment: Literal["neg", "neu", "pos", "pending"] | None = None,
                 status: Literal["open", "done", "all"] = "all", q: str | None = Query(None, max_length=50),
                 date_from: str | None = Query(None, alias="from"), date_to: str | None = Query(None, alias="to"),
-                user: User = Depends(current_user), db: Session = Depends(get_db)):
+                db: Session = Depends(get_db)):
     stmt = hit_query(db, group_id, sentiment, status, q, parse_dt(date_from), parse_dt(date_to))
     rows = list(db.scalars(stmt.order_by(Hit.id.desc()).limit(10_000)).unique())
     tz = ZoneInfo(get_settings().timezone)
@@ -257,7 +207,7 @@ class HitPatch(BaseModel):
 
 
 @router.patch("/hits/{hit_id}")
-def patch_hit(hit_id: int, body: HitPatch, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def patch_hit(hit_id: int, body: HitPatch, db: Session = Depends(get_db)):
     hit = db.get(Hit, hit_id)
     if not hit:
         raise HTTPException(404, "这条内容不存在或已过期")
@@ -275,7 +225,7 @@ def patch_hit(hit_id: int, body: HitPatch, user: User = Depends(current_user), d
 # ---------- 预警 ----------
 
 @router.get("/alerts/{alert_id}")
-def get_alert(alert_id: int, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def get_alert(alert_id: int, db: Session = Depends(get_db)):
     a = db.get(Alert, alert_id)
     if not a:
         raise HTTPException(404, "预警不存在")
@@ -291,7 +241,7 @@ class AlertPatch(BaseModel):
 
 
 @router.patch("/alerts/{alert_id}")
-def patch_alert(alert_id: int, body: AlertPatch, user: User = Depends(current_user), db: Session = Depends(get_db)):
+def patch_alert(alert_id: int, body: AlertPatch, db: Session = Depends(get_db)):
     a = db.get(Alert, alert_id)
     if not a:
         raise HTTPException(404, "预警不存在")
@@ -373,7 +323,7 @@ def _check_limits(words: list[str]):
 
 
 @router.get("/keyword-groups")
-def list_groups(user: User = Depends(current_user), db: Session = Depends(get_db)):
+def list_groups(db: Session = Depends(get_db)):
     s = get_settings()
     groups = db.scalars(select(KeywordGroup).order_by(KeywordGroup.id))
     return {"items": [group_out(db, g) for g in groups],
@@ -381,8 +331,7 @@ def list_groups(user: User = Depends(current_user), db: Session = Depends(get_db
 
 
 @router.post("/keyword-groups", status_code=201)
-def create_group(body: GroupIn, tasks: BackgroundTasks, user: User = Depends(admin_user),
-                 db: Session = Depends(get_db)):
+def create_group(body: GroupIn, tasks: BackgroundTasks, db: Session = Depends(get_db)):
     s = get_settings()
     if db.scalar(select(func.count(KeywordGroup.id))) >= s.max_groups:
         raise HTTPException(400, f"最多 {s.max_groups} 个关键词组，删除一组后可新建")
@@ -396,8 +345,7 @@ def create_group(body: GroupIn, tasks: BackgroundTasks, user: User = Depends(adm
 
 
 @router.put("/keyword-groups/{group_id}")
-def update_group(group_id: int, body: GroupPatch, tasks: BackgroundTasks, user: User = Depends(admin_user),
-                 db: Session = Depends(get_db)):
+def update_group(group_id: int, body: GroupPatch, tasks: BackgroundTasks, db: Session = Depends(get_db)):
     g = db.get(KeywordGroup, group_id)
     if not g:
         raise HTTPException(404, "关键词组不存在")
@@ -418,7 +366,7 @@ def update_group(group_id: int, body: GroupPatch, tasks: BackgroundTasks, user: 
 
 
 @router.delete("/keyword-groups/{group_id}")
-def delete_group(group_id: int, user: User = Depends(admin_user), db: Session = Depends(get_db)):
+def delete_group(group_id: int, db: Session = Depends(get_db)):
     g = db.get(KeywordGroup, group_id)
     if not g:
         raise HTTPException(404, "关键词组不存在")
@@ -442,26 +390,19 @@ class NotifyIn(BaseModel):
     neg_threshold: float | None = Field(None, ge=0, le=1)
 
 
-def _mask(url: str) -> str:
-    return f"…{url[-6:]}" if url else ""
-
-
-def notify_out(n: dict, is_admin: bool) -> dict:
+def notify_out(n: dict) -> dict:
     out = dict(n)
-    if not is_admin:
-        out["wecom_webhook"] = _mask(n["wecom_webhook"])
-        out["feishu_webhook"] = _mask(n["feishu_webhook"])
     out["email_configured"] = bool(get_settings().smtp_host)
     return out
 
 
 @router.get("/settings/notify")
-def get_notify_settings(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    return notify_out(get_notify(db), user.role == "admin")
+def get_notify_settings(db: Session = Depends(get_db)):
+    return notify_out(get_notify(db))
 
 
 @router.put("/settings/notify")
-def put_notify_settings(body: NotifyIn, user: User = Depends(admin_user), db: Session = Depends(get_db)):
+def put_notify_settings(body: NotifyIn, db: Session = Depends(get_db)):
     data = {k: (v.strip() if isinstance(v, str) else v) for k, v in body.model_dump(exclude_unset=True).items()
             if v is not None}
     for ch in ("wecom", "feishu"):
@@ -475,48 +416,10 @@ def put_notify_settings(body: NotifyIn, user: User = Depends(admin_user), db: Se
             raise HTTPException(400, f"请先填写{label}再启用")
     saved = save_notify(db, data)
     db.commit()
-    return notify_out(saved, True)
+    return notify_out(saved)
 
 
 @router.post("/settings/notify/test")
-def test_notify(user: User = Depends(admin_user), db: Session = Depends(get_db)):
+def test_notify(db: Session = Depends(get_db)):
     return {"result": send_test(db, pipeline.get_services().notifier)}
 
-
-# ---------- 成员 ----------
-
-class InviteIn(BaseModel):
-    phone: str
-    name: str = Field("新成员", min_length=1, max_length=20)
-    role: Literal["admin", "member"] = "member"
-
-
-@router.get("/users")
-def list_users(user: User = Depends(current_user), db: Session = Depends(get_db)):
-    return {"items": [user_out(u) for u in db.scalars(select(User).order_by(User.id))], "me": user.id}
-
-
-@router.post("/users", status_code=201)
-def invite_user(body: InviteIn, user: User = Depends(admin_user), db: Session = Depends(get_db)):
-    if not PHONE_RE.match(body.phone):
-        raise HTTPException(400, "请输入 11 位手机号")
-    if db.scalar(select(User.id).where(User.phone == body.phone)):
-        raise HTTPException(400, "该手机号已经是成员")
-    if db.scalar(select(func.count(User.id))) >= 10:
-        raise HTTPException(400, "V1 最多 10 个成员")
-    u = User(phone=body.phone, name=body.name.strip(), role=body.role)
-    db.add(u)
-    db.commit()
-    return user_out(u)
-
-
-@router.delete("/users/{user_id}")
-def remove_user(user_id: int, user: User = Depends(admin_user), db: Session = Depends(get_db)):
-    if user_id == user.id:
-        raise HTTPException(400, "不能移除自己")
-    u = db.get(User, user_id)
-    if not u:
-        raise HTTPException(404, "成员不存在")
-    db.delete(u)
-    db.commit()
-    return {"ok": True}

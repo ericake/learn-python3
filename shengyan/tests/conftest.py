@@ -3,12 +3,11 @@ import sys
 from pathlib import Path
 
 os.environ.update({
-    "APP_ENV": "dev",
     "ENABLE_SCHEDULER": "false",
     "TIKHUB_API_KEY": "",
     "LLM_API_KEY": "",
     "DATABASE_URL": "sqlite:///:memory:",
-    "ADMIN_PHONE": "13800000000",
+    "DEFAULT_KEYWORDS": "",
 })
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 

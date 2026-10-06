@@ -154,13 +154,6 @@ form.card label { font-size: 12px; color: var(--muted); display: grid; gap: 4px;
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
 /* ---- 对接后端新增 ---- */
-.login { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
-.login-card { width: 100%; max-width: 360px; background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 28px 24px; display: grid; gap: 14px; box-shadow: var(--shadow); }
-.login-card h1 { margin: 0; font-size: 20px; display: flex; align-items: center; gap: 10px; }
-.login-card p { margin: 0; color: var(--muted); font-size: 13px; }
-.login-card label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
-.code-row { display: flex; gap: 8px; }
-.code-row .input { flex: 1; }
 .btn:disabled { opacity: .5; cursor: not-allowed; }
 .banner { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; border-radius: 10px; padding: 9px 14px; margin-bottom: 14px; font-size: 13px; background: var(--neu-soft); color: var(--fg); }
 .banner.warn { background: var(--neg-soft); color: var(--neg); }
@@ -174,8 +167,6 @@ form.card label { font-size: 12px; color: var(--muted); display: grid; gap: 4px;
 .pill.pending { background: var(--neu-soft); color: var(--muted); border: 1px dashed var(--line); }
 .pill.backfill { background: none; color: var(--muted); border: 1px solid var(--line); }
 .reason { font-size: 12px; color: var(--muted); }
-.side-user { display: flex; align-items: center; gap: 8px; }
-.side-user .link { margin-left: auto; padding: 0; }
 .form-grid { display: grid; gap: 12px; }
 .ch { display: grid; gap: 8px; padding: 12px 0; border-top: 1px solid var(--line); }
 .ch:first-of-type { border-top: 0; }
@@ -186,6 +177,6 @@ form.card label { font-size: 12px; color: var(--muted); display: grid; gap: 4px;
 .result.ok { color: var(--pos); } .result.bad { color: var(--neg); }
 .deliv { display: grid; gap: 4px; font-size: 12px; color: var(--muted); margin-top: 10px; }
 .danger { color: var(--neg) !important; }
-.readonly-note { font-size: 12px; color: var(--muted); background: var(--neu-soft); border-radius: 8px; padding: 6px 10px; }
 textarea.input { resize: vertical; min-height: 64px; font: inherit; }
 a.btn { text-decoration: none; color: inherit; display: inline-flex; align-items: center; }
+form.card .checks label { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; color: var(--fg); font-size: 13px; }

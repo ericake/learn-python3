@@ -7,15 +7,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from .db import Base, utcnow
 
 
-class User(Base):
-    __tablename__ = "users"
-    id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    phone: Mapped[str] = mapped_column(String(20), unique=True)
-    name: Mapped[str] = mapped_column(String(50))
-    role: Mapped[str] = mapped_column(String(10), default="member")  # admin / member
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
-
-
 class KeywordGroup(Base):
     __tablename__ = "keyword_groups"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

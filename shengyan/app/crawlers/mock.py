@@ -46,9 +46,9 @@ class MockXhsCrawler:
             rng = random.Random(seed)
             _, title, body = rng.choice(TEMPLATES)
             note_id = hashlib.md5(seed.encode()).hexdigest()[:24]
-            published = start + timedelta(seconds=rng.randint(0, int(self.interval.total_seconds()) - 1))
-            if published > now:
-                continue
+            # 发布时间落在时间桶内且不晚于现在（当前桶还没走完时压缩到已过去的部分）
+            span = min(self.interval, now - start).total_seconds()
+            published = start + timedelta(seconds=span * rng.random())
             likes = rng.choice([12, 86, 230, 640, 1832, 3120, 12400])
             notes.append(NoteData(
                 platform_post_id=note_id,

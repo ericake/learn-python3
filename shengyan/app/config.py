@@ -11,12 +11,9 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=BASE_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
 
     # 基础
-    app_env: str = "dev"  # dev 时登录接口会直接返回验证码，方便本地调试
-    app_secret_key: str = "change-me-in-production"
     timezone: str = "Asia/Shanghai"
     database_url: str = f"sqlite:///{BASE_DIR / 'shengyan.db'}"
-    admin_phone: str = "13800000000"
-    admin_name: str = "管理员"
+    default_keywords: str = "全嘻嘻"  # 首次启动时自动创建的关键词组，逗号分隔；留空则不创建
     public_base_url: str = "http://localhost:8000"  # 预警消息里“在系统中处理”的链接前缀
     enable_scheduler: bool = True
 
