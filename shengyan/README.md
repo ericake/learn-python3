@@ -4,7 +4,16 @@
 
 ## 本地运行
 
-需要 Python 3.11 及以上。
+代码在分支 `claude/keen-lovelace-3t1bm7`（还没合并到 master）：
+
+```bash
+git fetch origin
+git checkout claude/keen-lovelace-3t1bm7
+```
+
+需要 Python 3.10 及以上。最简单的方式：Windows 双击 `shengyan/start.bat`，Mac / Linux 运行 `bash shengyan/start.sh`。第一次会自动安装依赖并生成 `.env`，之后把 Key 填进 `.env` 再重新启动。
+
+也可以手动：
 
 ```bash
 cd shengyan
@@ -15,11 +24,24 @@ cp .env.example .env               # 填入 TIKHUB_API_KEY 和 LLM_API_KEY
 python run.py
 ```
 
-浏览器打开 http://localhost:8000 即可使用，不需要登录。首次启动会自动创建关键词组“全嘻嘻”并开始回溯近 3 天的内容；想换默认词，在首次启动前修改 `.env` 里的 `DEFAULT_KEYWORDS`，之后在“关键词管理”页增删即可。
+终端出现 `Application startup complete` 后，浏览器打开 http://127.0.0.1:8000 即可使用（运行期间不要关掉终端窗口），不需要登录。首次启动会自动创建关键词组“全嘻嘻”并开始回溯近 3 天的内容；想换默认词，在首次启动前修改 `.env` 里的 `DEFAULT_KEYWORDS`，之后在“关键词管理”页增删即可。
 
 **只在本机访问**：系统没有登录，服务默认只监听 `127.0.0.1`。如果设置 `HOST=0.0.0.0` 让同一网络里的其他电脑访问，任何能连上的人都能查看和修改数据。
 
 **不填 Key 也能跑**：没有 `TIKHUB_API_KEY` 时使用演示数据源，没有 `LLM_API_KEY` 时使用本地规则判断情感，页面右上角会标出当前是演示模式。想更快看到增量数据和预警，可以设置 `CRAWL_INTERVAL_MIN=1`。
+
+## 打不开页面时
+
+| 现象 | 原因与处理 |
+| --- | --- |
+| 浏览器提示“无法访问此网站 / 拒绝连接” | 服务没在运行。先执行 `python run.py`（或 start 脚本），窗口保持打开 |
+| 找不到 `shengyan` 目录 | 还在 master 分支，按上面切换到 `claude/keen-lovelace-3t1bm7` |
+| 提示“需要 Python 3.10 或更高版本” | 升级 Python |
+| 提示 `No module named ...` | 在 `shengyan` 目录执行 `pip install -r requirements.txt` |
+| 提示“端口 8000 已被占用” | 已经有一个在运行，直接打开页面；或用 `PORT=8001` 换端口 |
+| `localhost` 打不开但服务在运行 | 改用 http://127.0.0.1:8000 |
+
+仍然不行时，把终端里的完整输出发给开发者。
 
 ## 密钥
 
