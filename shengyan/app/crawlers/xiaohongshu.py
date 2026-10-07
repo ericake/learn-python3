@@ -184,6 +184,14 @@ class TikHubXhsCrawler:
 
     def search(self, keyword: str, page: int = 1, search_id: str | None = None,
                time_filter: str = "一天内") -> SearchPage:
+        payload, attempts = self.fetch_raw(keyword, page, search_id, time_filter)
+        page_result = parse_search_response(payload)
+        page_result.request_count = attempts
+        return page_result
+
+    def fetch_raw(self, keyword: str, page: int = 1, search_id: str | None = None,
+                  time_filter: str = "一天内") -> tuple[dict, int]:
+        """请求一页搜索结果，返回 (原始 JSON, 请求次数)。带限流与重试。"""
         params = {"keyword": keyword, "page": page, "sort_type": "time_descending",
                   "note_type": "不限", "time_filter": time_filter}
         if search_id:
@@ -206,13 +214,14 @@ class TikHubXhsCrawler:
                 elif resp.status_code != 200:
                     raise CrawlerError(f"TikHub 返回 {resp.status_code}：{resp.text[:2048]}")
                 else:
-                    payload = resp.json()
+                    try:
+                        payload = resp.json()
+                    except ValueError:
+                        raise CrawlerError(f"TikHub 返回的不是 JSON：{resp.text[:300]}")
                     code = payload.get("code") if isinstance(payload, dict) else None
                     if code not in (None, 200, 0):
                         raise CrawlerError(f"TikHub 业务码 {code}：{str(payload)[:2048]}")
-                    page_result = parse_search_response(payload)
-                    page_result.request_count = attempts
-                    return page_result
+                    return payload, attempts
             if attempt < len(RETRY_DELAYS):
                 log.warning("TikHub 请求失败（%s），%ss 后重试", last_error, RETRY_DELAYS[attempt])
                 self._sleep(RETRY_DELAYS[attempt])

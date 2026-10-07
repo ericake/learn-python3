@@ -99,7 +99,7 @@ def test_hits_list_filter_patch_export(client, env):
     assert len(client.get("/api/v1/hits", params={"status": "all"}).json()["items"]) == 1
 
     s = client.get("/api/v1/summary").json()
-    assert s["today_hits"] == 1 and s["system"]["crawler_mode"] in ("mock", "tikhub")
+    assert s["today_hits"] == 1 and s["system"]["crawler_mode"] == "none"
 
     r = client.get("/api/v1/hits/export")
     assert r.status_code == 200 and "spreadsheetml" in r.headers["content-type"]

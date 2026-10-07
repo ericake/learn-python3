@@ -11,7 +11,7 @@ git fetch origin
 git checkout claude/keen-lovelace-3t1bm7
 ```
 
-需要 Python 3.10 及以上。最简单的方式：Windows 双击 `shengyan/start.bat`，Mac / Linux 运行 `bash shengyan/start.sh`。第一次会自动安装依赖并生成 `.env`，之后把 Key 填进 `.env` 再重新启动。
+需要 Python 3.10 及以上。最简单的方式：Windows 双击 `shengyan/start.bat`，Mac / Linux 运行 `bash shengyan/start.sh`。第一次会自动安装依赖，并提示粘贴 TikHub Token 和 DeepSeek Key（保存在本机 `.env`）。
 
 也可以手动：
 
@@ -28,7 +28,15 @@ python run.py
 
 **只在本机访问**：系统没有登录，服务默认只监听 `127.0.0.1`。如果设置 `HOST=0.0.0.0` 让同一网络里的其他电脑访问，任何能连上的人都能查看和修改数据。
 
-**不填 Key 也能跑**：没有 `TIKHUB_API_KEY` 时使用演示数据源，没有 `LLM_API_KEY` 时使用本地规则判断情感，页面右上角会标出当前是演示模式。想更快看到增量数据和预警，可以设置 `CRAWL_INTERVAL_MIN=1`。
+**真实数据需要 TikHub Token**：没有 `TIKHUB_API_KEY` 时系统不会抓取，页面会提示配置；没有 `LLM_API_KEY` 时用本地规则判断情感。之前用演示数据跑过的，配好 Token 重启后会自动清掉演示数据，并重新回溯近 3 天的真实内容。只想看界面效果可以设置 `CRAWLER_MODE=mock`（演示数据，不是真实数据）。
+
+## 检查 Key 和真实抓取
+
+```bash
+python check_api.py          # 默认搜索“全嘻嘻”
+```
+
+它会用 `.env` 里的 Key 真实请求一次 TikHub 和 DeepSeek，打印解析出的笔记（标题、作者、发布时间、点赞）和情感判断结果，并把 TikHub 原始响应存到 `tikhub_sample.json`。作者、时间、点赞都是空的，或者“解析出 0 篇”时，把这个文件发给开发者调整字段映射。
 
 ## 打不开页面时
 
@@ -40,6 +48,8 @@ python run.py
 | 提示 `No module named ...` | 在 `shengyan` 目录执行 `pip install -r requirements.txt` |
 | 提示“端口 8000 已被占用” | 已经有一个在运行，直接打开页面；或用 `PORT=8001` 换端口 |
 | `localhost` 打不开但服务在运行 | 改用 http://127.0.0.1:8000 |
+| 页面提示“未配置 TikHub Token” | 在 `.env` 填写 `TIKHUB_API_KEY` 后重启 |
+| 页面提示“最近一次采集失败”或“授权失效” | 运行 `python check_api.py` 查看具体原因 |
 
 仍然不行时，把终端里的完整输出发给开发者。
 

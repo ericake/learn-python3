@@ -60,10 +60,16 @@ def system_status(db: Session) -> dict:
     st = get_crawler_status(db)
     words = pipeline.active_keywords(db)
     delayed = bool(words) and (last_success is None or utcnow() - last_success > timedelta(minutes=30))
-    if st.get("auth_failed"):
+    last_error = db.scalar(select(CrawlState.last_error).where(CrawlState.last_error.is_not(None))
+                           .order_by(CrawlState.last_run_at.desc()).limit(1))
+    if s.effective_crawler_mode == "none":
+        state, message = "no_token", "未配置 TikHub Token，无法抓取真实数据。请在 .env 中填写 TIKHUB_API_KEY 后重启"
+    elif st.get("auth_failed"):
         state, message = "auth_failed", "数据源授权失效，请检查 TikHub Token"
     elif st.get("paused_until") and datetime.fromisoformat(st["paused_until"]) > utcnow():
         state, message = "paused", "数据源请求过于频繁，暂停 5 分钟"
+    elif last_error and (last_success is None or delayed):
+        state, message = "error", f"最近一次采集失败：{last_error[:200]}"
     elif delayed and last_success is not None:
         state, message = "delayed", "数据延迟：超过 30 分钟没有成功采集"
     elif not words:

@@ -6,6 +6,6 @@ if not exist .venv (
   python -m venv .venv || (echo 没找到 Python，请先安装 Python 3.10 及以上版本，安装时勾选 "Add Python to PATH" & pause & exit /b 1)
   .venv\Scripts\python -m pip install -r requirements.txt || (echo 依赖安装失败，请把上面的报错发给开发者 & pause & exit /b 1)
 )
-if not exist .env copy .env.example .env >nul
+.venv\Scripts\python setup_env.py
 .venv\Scripts\python run.py
 pause

@@ -6,18 +6,38 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy import func, select, text
+from sqlalchemy import delete, func, select, text
 
 from .api.routes import router
 from .config import BASE_DIR, get_settings
 from .db import SessionLocal, init_db
 from .jobs import scheduler
-from .models import CrawlState, KeywordGroup
+from .models import CrawlState, KeywordGroup, Post
 from .settings_store import get_value, save_crawler_status, save_value
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("shengyan")
 STATIC_DIR = BASE_DIR / "static"
+
+
+def purge_mock_data(db) -> int:
+    """删掉演示数据源生成的笔记（命中、预警随外键一起删除），并清空采集状态，让真实采集重新回溯。"""
+    ids = [pid for pid, raw in db.execute(select(Post.id, Post.raw)) if isinstance(raw, dict) and raw.get("mock")]
+    for i in range(0, len(ids), 500):
+        db.execute(delete(Post).where(Post.id.in_(ids[i:i + 500])))
+    db.execute(delete(CrawlState))
+    return len(ids)
+
+
+def switch_data_mode(db) -> None:
+    """从演示数据切换到真实采集时清理演示数据。旧版本没有记录模式，也按“可能有演示数据”处理。"""
+    mode = get_settings().effective_crawler_mode
+    last = get_value(db, "data_mode", {}).get("mode")
+    if mode != "mock" and last in (None, "mock"):
+        n = purge_mock_data(db)
+        if n:
+            log.info("已清理 %s 篇演示数据，并重置采集状态，将用真实数据重新回溯", n)
+    save_value(db, "data_mode", {"mode": mode})
 
 
 def seed() -> None:
@@ -30,6 +50,7 @@ def seed() -> None:
                 db.add(KeywordGroup(name=words[0], words=words[:s.max_words_per_group], exclude_words=[], platforms=["xhs"]))
                 log.info("已创建默认关键词组：%s", "、".join(words))
             save_value(db, "seed", {"default_group": True})
+        switch_data_mode(db)
         save_crawler_status(db, auth_failed=False, auth_error="", paused_until=None)  # 重启即重试
         db.commit()
 
@@ -40,8 +61,10 @@ async def lifespan(app: FastAPI):
     init_db()
     seed()
     log.info("数据源：%s；情感判断：%s", s.effective_crawler_mode, s.effective_sentiment_mode)
-    if s.effective_crawler_mode == "mock":
-        log.warning("未配置 TIKHUB_API_KEY，使用演示数据源（mock）")
+    if s.effective_crawler_mode == "none":
+        log.warning("未配置 TIKHUB_API_KEY：不会抓取数据。请在 .env 中填写后重启")
+    elif s.effective_crawler_mode == "mock":
+        log.warning("CRAWLER_MODE=mock：使用演示数据，不是真实数据")
     if s.effective_sentiment_mode == "rule":
         log.warning("未配置 LLM_API_KEY，情感判断使用本地规则（仅供演示）")
     if s.enable_scheduler:

@@ -2,6 +2,7 @@
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -24,7 +25,7 @@ class Settings(BaseSettings):
     tikhub_concurrency: int = 2
     tikhub_min_interval_ms: int = 1000
     tikhub_timeout_s: float = 15.0
-    crawler_mode: str = "auto"  # auto：有 Token 用 tikhub，否则 mock
+    crawler_mode: str = "auto"  # auto：有 Token 用 tikhub，否则不采集；mock：演示数据（需显式设置）
 
     # 采集调度
     crawl_interval_min: int = 10
@@ -51,11 +52,17 @@ class Settings(BaseSettings):
     max_groups: int = 3
     max_words_per_group: int = 20
 
+    @field_validator("tikhub_api_key", "llm_api_key", mode="before")
+    @classmethod
+    def _strip_key(cls, v):
+        # 从网页或聊天里复制 Key 时常带空格、引号
+        return str(v or "").strip().strip('"').strip("'").strip()
+
     @property
     def effective_crawler_mode(self) -> str:
         if self.crawler_mode != "auto":
             return self.crawler_mode
-        return "tikhub" if self.tikhub_api_key else "mock"
+        return "tikhub" if self.tikhub_api_key else "none"
 
     @property
     def effective_sentiment_mode(self) -> str:

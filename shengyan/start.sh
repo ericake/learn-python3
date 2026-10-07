@@ -7,5 +7,5 @@ if [ ! -d .venv ]; then
   python3 -m venv .venv
   .venv/bin/python -m pip install -r requirements.txt
 fi
-[ -f .env ] || cp .env.example .env
+.venv/bin/python setup_env.py
 exec .venv/bin/python run.py

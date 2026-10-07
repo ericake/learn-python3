@@ -116,7 +116,8 @@
     const s = state.summary?.system;
     if (!s) return '';
     if (s.state === 'auth_failed') return `<div class="banner warn">${esc(s.message)}<button class="btn" data-act="resume">已更换 Token，恢复采集</button></div>`;
-    if (['paused', 'delayed'].includes(s.state)) return `<div class="banner warn">${esc(s.message)}</div>`;
+    if (s.state === 'no_token') return `<div class="banner warn">${esc(s.message)}（可先运行 python check_api.py 检查 Key 是否可用）</div>`;
+    if (['paused', 'delayed', 'error'].includes(s.state)) return `<div class="banner warn">${esc(s.message)}</div>`;
     if (s.state === 'idle') return `<div class="banner">还没有启用的关键词组。<button class="btn" data-page="keywords">去添加关键词</button></div>`;
     if (s.state === 'starting') return `<div class="banner">正在进行首次采集，稍后刷新即可看到内容。</div>`;
     return '';
@@ -126,7 +127,7 @@
     const s = state.summary?.system;
     if (!s) return '';
     const tags = [];
-    if (s.crawler_mode === 'mock') tags.push('<span class="pill">演示数据源（未配置 TikHub Token）</span>');
+    if (s.crawler_mode === 'mock') tags.push('<span class="pill">演示数据（CRAWLER_MODE=mock，不是真实数据）</span>');
     if (s.sentiment_mode === 'rule') tags.push('<span class="pill">规则情感（未配置 DeepSeek Key）</span>');
     return tags.length ? `<div class="mode">${tags.join('')}</div>` : '';
   }
@@ -158,7 +159,7 @@
       <a class="btn" id="export" href="${API}/hits/export?${hitsQuery()}">导出 Excel</a>
     </div>
     ${state.newCount ? `<div class="newbar"><button data-act="refresh">有新内容，点击刷新</button></div>` : ''}
-    <div class="feed">${state.hits.length ? state.hits.map(postHTML).join('') : `<div class="empty">${state.loading ? '加载中…' : '没有符合条件的内容。'}</div>`}</div>
+    <div class="feed">${state.hits.length ? state.hits.map(postHTML).join('') : `<div class="empty">${state.loading ? '加载中…' : sys.state === 'no_token' ? '配置 TikHub Token 并重启后开始抓取小红书数据。' : sys.state === 'starting' ? '正在抓取近 3 天的数据，稍后刷新。' : '没有符合条件的内容。'}</div>`}</div>
     ${state.cursor ? `<div class="more"><button class="btn" data-act="more" ${state.loading ? 'disabled' : ''}>加载更多</button></div>` : ''}`;
   }
 
@@ -257,7 +258,7 @@
       <div class="card"><h3>数据源</h3>
         <div class="list" style="margin-top:8px">
           <div class="item"><div>采集状态<small>${esc(sys.message || '—')}</small></div></div>
-          <div class="item"><div>数据源<small>${sys.crawler_mode === 'tikhub' ? 'TikHub 小红书搜索接口' : '演示数据（未配置 TIKHUB_API_KEY）'}</small></div></div>
+          <div class="item"><div>数据源<small>${{ tikhub: 'TikHub 小红书搜索接口（真实数据）', mock: '演示数据（CRAWLER_MODE=mock）', none: '未配置 TIKHUB_API_KEY，不抓取' }[sys.crawler_mode] || sys.crawler_mode}</small></div></div>
           <div class="item"><div>情感判断<small>${sys.sentiment_mode === 'llm' ? 'DeepSeek 大模型' : '本地规则（未配置 LLM_API_KEY）'}</small></div></div>
           <div class="item"><div>监测词<small>${sys.keyword_count ?? 0} 个 · 每 ${sys.interval_min ?? 10} 分钟一轮 · 最近成功 ${sys.last_success_at ? fmtTime(sys.last_success_at) : '—'}</small></div></div>
         </div>

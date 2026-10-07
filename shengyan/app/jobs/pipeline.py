@@ -29,7 +29,7 @@ GLOBAL_PAUSE = timedelta(minutes=5)
 @dataclass
 class Services:
     settings: Settings
-    crawler: Crawler
+    crawler: Crawler | None  # None：没配置 TikHub Token，不采集
     classifier: SentimentClassifier
     notifier: Notifier
     consecutive_failures: int = 0
@@ -42,9 +42,11 @@ _services: Services | None = None
 
 def build_services(settings: Settings | None = None) -> Services:
     settings = settings or get_settings()
-    if settings.effective_crawler_mode == "tikhub":
-        crawler: Crawler = TikHubXhsCrawler(settings)
-    else:
+    mode = settings.effective_crawler_mode
+    crawler: Crawler | None = None
+    if mode == "tikhub":
+        crawler = TikHubXhsCrawler(settings)
+    elif mode == "mock":
         crawler = MockXhsCrawler(interval_min=settings.crawl_interval_min)
     return Services(settings=settings, crawler=crawler, classifier=make_classifier(settings),
                     notifier=Notifier(settings))
@@ -139,6 +141,9 @@ def crawl_keyword(keyword: str, backfill: bool = False, services: Services | Non
     services = services or get_services()
     s = services.settings
     res = CrawlResult(keyword)
+    if services.crawler is None:
+        res.error = "未配置 TikHub Token"
+        return res
     with services.lock:
         if keyword in services.running:
             res.error = "该监测词正在采集中"
@@ -252,7 +257,9 @@ def active_keywords(db: Session) -> list[str]:
     return words
 
 
-def crawler_blocked(db: Session) -> str | None:
+def crawler_blocked(db: Session, services: Services | None = None) -> str | None:
+    if services is not None and services.crawler is None:
+        return "未配置 TikHub Token"
     st = get_crawler_status(db)
     if st.get("auth_failed"):
         return "数据源授权失效"
@@ -287,7 +294,7 @@ def retry_pending_sentiment(services: Services, limit: int = 20) -> int:
 def run_due(services: Services | None = None) -> list[CrawlResult]:
     services = services or get_services()
     with session_scope() as db:
-        blocked = crawler_blocked(db)
+        blocked = crawler_blocked(db, services)
         jobs = [] if blocked else due_jobs(db, services.settings)
     results = [crawl_keyword(word, backfill, services) for word, backfill in jobs]
     retry_pending_sentiment(services)
