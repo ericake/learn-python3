@@ -39,6 +39,16 @@ def _edit_distance(a: str, b: str) -> int:
     return prev[-1]
 
 
+def _tokens(text: str) -> set[str]:
+    return {t for t in text.lower().replace("'", " ").split() if len(t) > 2}
+
+
+def overlaps(a: str, b: str) -> bool:
+    """共享实词（如 puddle / muddy puddle、jump / jump up and down）的两个条目，图片往往相近，不能互为干扰项。"""
+    ta, tb = _tokens(a), _tokens(b)
+    return bool(ta & tb) or any(x.startswith(y) or y.startswith(x) for x in ta for y in tb if min(len(x), len(y)) >= 3)
+
+
 def sounds_similar(a: str, b: str) -> bool:
     a, b = a.lower(), b.lower()
     return a != b and len(a) > 1 and len(b) > 1 and _edit_distance(a, b) <= 1
@@ -85,6 +95,8 @@ class LessonBuilder:
                 if len(picked) >= k:
                     break
                 if strict_sound and sounds_similar(c.text, answer.text):
+                    continue
+                if overlaps(c.text, answer.text):
                     continue
                 if c.image not in picked:
                     picked.append(c.image)

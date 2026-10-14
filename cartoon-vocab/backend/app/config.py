@@ -7,6 +7,22 @@ from pathlib import Path
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 
+def _load_dotenv(path: Path) -> None:
+    """读取 backend/.env（不覆盖已存在的环境变量）。"""
+    if not path.is_file():
+        return
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+if not os.environ.get("PYTEST_CURRENT_TEST"):
+    _load_dotenv(BACKEND_DIR / ".env")
+
+
 def _env(name: str, default: str = "") -> str:
     return os.environ.get(name, default).strip()
 

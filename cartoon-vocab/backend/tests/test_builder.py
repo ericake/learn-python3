@@ -68,3 +68,20 @@ def test_review_with_preview_uses_warmup_and_fits_time():
 def test_single_item_has_no_choice_questions():
     steps = LessonBuilder([item(0, "puddle")], seed=0).preview()
     assert not _choice_steps(steps)
+
+
+def test_overlapping_items_are_never_distractors_for_each_other():
+    from app.lessons.builder import overlaps
+
+    assert overlaps("puddle", "muddy puddle") and overlaps("jump", "jump up and down")
+    assert overlaps("mud", "muddy")
+    assert not overlaps("rain", "boots")
+    for seed in range(20):
+        lb = LessonBuilder(ITEMS, seed=seed)
+        for steps in (lb.preview(), lb.review(did_preview=True)):
+            for s in _choice_steps(steps):
+                answer = next(i for i in ITEMS if i.image == s["answer"])
+                for o in s["options"]:
+                    other = next(i for i in ITEMS if i.image == o)
+                    if other is not answer:
+                        assert not overlaps(other.text, answer.text), (answer.text, other.text)
