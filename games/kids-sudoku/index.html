@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>小小数独乐园</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=ZCOOL+KuaiLe&display=swap">
+<style>
+/* Layout: one playful column — owl guide on top, colour-blocked board in the middle, big chunky picker below. */
+:root {
+  --bg: #E8F3FB;
+  --surface: #FFFFFF;
+  --ink: #233650;
+  --muted: #5B6E87;
+  --accent: #FF7440;
+  --accent-ink: #FFFFFF;
+  --sun: #FFC53D;
+  --good: #23A971;
+  --bad: #E0464B;
+  --cell: #FFFFFF;
+  --cell-given: #F4F7FB;
+  --peer: #FFF4CF;
+  --same: #FFE1CF;
+  --line: #D3E0EC;
+  --shadow: rgba(35, 54, 80, .14);
+  --box1: #FFDCC8;
+  --box2: #CDEEDC;
+  --box3: #D5E3FF;
+  --box4: #FFEDB3;
+  --n1: #E0464B; --n2: #2B7FD9; --n3: #23A971; --n4: #E08A00; --n5: #8C52D9; --n6: #D9408F;
+  --font-display: "ZCOOL KuaiLe", "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
+  --font-body: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans SC", system-ui, sans-serif;
+  --font-num: "Fredoka", "Arial Rounded MT Bold", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12203A; --surface: #1B2A48; --ink: #EEF3FB; --muted: #A3B3CB;
+    --accent: #FF8A5C; --accent-ink: #1A1206; --sun: #FFCF5C; --good: #4CD497; --bad: #FF6B6F;
+    --cell: #253860; --cell-given: #1E2E50; --peer: #3B3A2C; --same: #4A3326; --line: #2E4370;
+    --shadow: rgba(0, 0, 0, .35);
+    --box1: #4B3122; --box2: #1E4636; --box3: #26386A; --box4: #4B4020;
+    --n1: #FF7B7F; --n2: #6DB1FF; --n3: #4CD497; --n4: #FFB547; --n5: #B98BFF; --n6: #FF7FBF;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #12203A; --surface: #1B2A48; --ink: #EEF3FB; --muted: #A3B3CB;
+  --accent: #FF8A5C; --accent-ink: #1A1206; --sun: #FFCF5C; --good: #4CD497; --bad: #FF6B6F;
+  --cell: #253860; --cell-given: #1E2E50; --peer: #3B3A2C; --same: #4A3326; --line: #2E4370;
+  --shadow: rgba(0, 0, 0, .35);
+  --box1: #4B3122; --box2: #1E4636; --box3: #26386A; --box4: #4B4020;
+  --n1: #FF7B7F; --n2: #6DB1FF; --n3: #4CD497; --n4: #FFB547; --n5: #B98BFF; --n6: #FF7FBF;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { min-height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 16px;
+  -webkit-tap-highlight-color: transparent;
+}
+.wrap {
+  max-width: 560px;
+  margin: 0 auto;
+  padding-block: 16px 32px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- header ---------- */
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+h1 {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(30px, 8vw, 40px);
+  margin: 0;
+  line-height: 1;
+  letter-spacing: 2px;
+}
+h1 .dot { color: var(--accent); }
+.stash {
+  display: flex; align-items: center; gap: 6px;
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 6px 12px;
+  box-shadow: 0 2px 0 var(--line);
+  font-family: var(--font-num);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.icon-btn {
+  width: 44px; height: 44px; border-radius: 50%;
+  border: 0; background: var(--surface);
+  box-shadow: 0 2px 0 var(--line);
+  font-size: 20px;
+}
+.head-right { display: flex; gap: 8px; align-items: center; }
+
+/* ---------- setting chips ---------- */
+.settings { display: flex; flex-wrap: wrap; gap: 10px; }
+.seg {
+  display: flex; gap: 4px; padding: 4px;
+  background: var(--surface); border-radius: 16px;
+  box-shadow: 0 2px 0 var(--line);
+  flex: 1 1 220px;
+}
+.seg button {
+  flex: 1; border: 0; background: transparent;
+  border-radius: 12px; padding: 8px 6px;
+  font-size: 15px; font-weight: 600; line-height: 1.15;
+  color: var(--muted);
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.seg button small { font-family: var(--font-num); font-size: 12px; font-weight: 500; opacity: .85; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-ink); }
+
+/* ---------- owl guide ---------- */
+.guide { display: flex; align-items: flex-end; gap: 10px; min-height: 64px; }
+.owl { font-size: 46px; line-height: 1; flex: none; transform-origin: bottom center; }
+.owl.hop { animation: hop .5s ease; }
+.bubble {
+  position: relative;
+  background: var(--surface);
+  border-radius: 18px;
+  padding: 10px 14px;
+  font-size: 17px; line-height: 1.45;
+  box-shadow: 0 2px 0 var(--line);
+  flex: 1; min-width: 0;
+}
+.bubble::before {
+  content: ""; position: absolute; left: -8px; bottom: 14px;
+  border: 8px solid transparent; border-right-color: var(--surface); border-left: 0;
+}
+.bubble b { color: var(--accent); }
+
+/* ---------- board ---------- */
+.board-wrap { display: flex; justify-content: center; }
+.board {
+  --size: min(100%, 440px);
+  width: var(--size);
+  aspect-ratio: 1;
+  max-width: 100%;
+  display: grid;
+  gap: 8px;
+  padding: 8px;
+  background: var(--surface);
+  border-radius: 24px;
+  box-shadow: 0 6px 0 var(--line), 0 14px 30px var(--shadow);
+}
+.box {
+  display: grid;
+  gap: 5px;
+  padding: 5px;
+  border-radius: 16px;
+}
+.box.c1 { background: var(--box1); }
+.box.c2 { background: var(--box2); }
+.box.c3 { background: var(--box3); }
+.box.c4 { background: var(--box4); }
+.cell {
+  border: 0;
+  border-radius: 12px;
+  background: var(--cell);
+  display: grid; place-items: center;
+  font-family: var(--font-num);
+  font-weight: 700;
+  line-height: 1;
+  position: relative;
+  box-shadow: inset 0 -3px 0 rgba(0,0,0,.06);
+  transition: background-color .15s, transform .12s;
+  min-width: 0; min-height: 0;
+  padding: 0;
+  user-select: none;
+}
+.board.n4 .cell { font-size: clamp(28px, 10vw, 50px); }
+.board.n6 .cell { font-size: clamp(20px, 6.6vw, 34px); }
+.cell.given { background: var(--cell-given); cursor: default; }
+.cell.empty::after {
+  content: ""; width: 22%; aspect-ratio: 1; border-radius: 50%;
+  background: var(--line);
+}
+.cell.peer { background: var(--peer); }
+.cell.same { background: var(--same); }
+.cell.sel {
+  background: var(--peer);
+  box-shadow: 0 0 0 4px var(--accent), inset 0 -3px 0 rgba(0,0,0,.06);
+  z-index: 1;
+}
+.cell.sel.empty::after { background: var(--accent); opacity: .55; animation: blink 1.1s ease-in-out infinite; }
+.cell.mine:not(.sel)::before {
+  content: ""; position: absolute; right: 6px; top: 6px;
+  width: 7px; height: 7px; border-radius: 50%; background: var(--good);
+}
+.cell.pop .sym { animation: pop .45s cubic-bezier(.3,1.6,.5,1); }
+.cell.wrong { animation: shake .45s; background: color-mix(in srgb, var(--bad) 22%, var(--cell)); }
+.cell.wrong .sym { opacity: .7; }
+.cell.clash { animation: flash .9s ease 1; }
+.cell.hinted { animation: glow 1s ease 1; }
+.sym { display: block; }
+.num1 { color: var(--n1); } .num2 { color: var(--n2); } .num3 { color: var(--n3); }
+.num4 { color: var(--n4); } .num5 { color: var(--n5); } .num6 { color: var(--n6); }
+
+/* ---------- picker ---------- */
+.picker { display: grid; gap: 10px; }
+.picker.n4 { grid-template-columns: repeat(4, 1fr); }
+.picker.n6 { grid-template-columns: repeat(6, 1fr); }
+.pick {
+  border: 0;
+  background: var(--surface);
+  border-radius: 18px;
+  padding: 8px 0 6px;
+  box-shadow: 0 5px 0 var(--line);
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  font-family: var(--font-num); font-weight: 700;
+  transition: transform .08s, box-shadow .08s, opacity .2s;
+  min-width: 0;
+}
+.picker.n4 .pick .sym { font-size: clamp(32px, 10vw, 46px); }
+.picker.n6 .pick .sym { font-size: clamp(24px, 7vw, 34px); }
+.pick:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--line); }
+.pick.done { opacity: .38; }
+.dots { display: flex; gap: 3px; height: 8px; }
+.dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); display: block; }
+.pick.done .dots::after { content: "✓"; font-size: 12px; line-height: 8px; color: var(--good); }
+
+.actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.btn {
+  flex: 1 1 140px;
+  border: 0; border-radius: 16px;
+  padding: 13px 14px;
+  font-size: 18px; font-weight: 700;
+  background: var(--surface);
+  box-shadow: 0 4px 0 var(--line);
+}
+.btn.primary { background: var(--accent); color: var(--accent-ink); box-shadow: 0 4px 0 color-mix(in srgb, var(--accent) 60%, #000); }
+.btn:active { transform: translateY(3px); box-shadow: 0 1px 0 var(--line); }
+
+.rules {
+  background: var(--surface);
+  border-radius: 18px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 0 var(--line);
+  font-size: 15px; line-height: 1.6;
+  color: var(--muted);
+}
+.rules h2 { font-family: var(--font-display); font-weight: 400; font-size: 20px; margin: 0 0 6px; color: var(--ink); }
+.rules ol { margin: 0; padding-left: 1.3em; }
+.rules li b { color: var(--ink); }
+.rules p { margin: 8px 0 0; }
+
+/* ---------- win overlay ---------- */
+.overlay {
+  position: fixed; inset: 0;
+  background: color-mix(in srgb, var(--bg) 70%, transparent);
+  backdrop-filter: blur(3px);
+  display: grid; place-items: center;
+  padding: 16px;
+  z-index: 20;
+}
+.win {
+  background: var(--surface);
+  border-radius: 28px;
+  padding: 26px 22px 22px;
+  width: min(100%, 360px);
+  text-align: center;
+  box-shadow: 0 8px 0 var(--line), 0 20px 50px var(--shadow);
+  animation: rise .5s cubic-bezier(.3,1.4,.5,1);
+}
+.win h2 { font-family: var(--font-display); font-weight: 400; font-size: 36px; margin: 0; color: var(--accent); }
+.win p { margin: 8px 0 16px; color: var(--muted); font-size: 16px; line-height: 1.5; }
+.stars { display: flex; justify-content: center; gap: 8px; font-size: 48px; margin-top: 10px; }
+.stars span { filter: grayscale(1); opacity: .3; }
+.stars span.on { filter: none; opacity: 1; animation: pop .5s cubic-bezier(.3,1.6,.5,1) both; }
+.stars span.on:nth-child(2) { animation-delay: .2s; }
+.stars span.on:nth-child(3) { animation-delay: .4s; }
+#confetti { position: fixed; inset: 0; pointer-events: none; z-index: 30; width: 100%; height: 100%; }
+
+@keyframes pop { 0% { transform: scale(.2); } 100% { transform: scale(1); } }
+@keyframes shake { 0%,100% { transform: translateX(0); } 20%,60% { transform: translateX(-6px); } 40%,80% { transform: translateX(6px); } }
+@keyframes flash { 0%,100% { box-shadow: inset 0 -3px 0 rgba(0,0,0,.06); } 30%,70% { box-shadow: 0 0 0 4px var(--bad); } }
+@keyframes glow { 0% { box-shadow: 0 0 0 0 var(--sun); } 50% { box-shadow: 0 0 0 8px var(--sun); } 100% { box-shadow: 0 0 0 0 var(--sun); } }
+@keyframes blink { 50% { transform: scale(.6); } }
+@keyframes hop { 30% { transform: translateY(-10px) rotate(-6deg); } 60% { transform: translateY(0) rotate(4deg); } }
+@keyframes rise { from { transform: translateY(30px) scale(.9); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+@media (max-width: 380px) {
+  .seg button { font-size: 14px; }
+  .bubble { font-size: 16px; }
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>小小数独</h1>
+    <div class="head-right">
+      <div class="stash" title="一共完成了多少局" aria-label="已完成局数"><span aria-hidden="true">🏅</span><span id="trophies">0</span></div>
+      <button class="icon-btn" id="soundBtn" aria-label="声音开关" title="声音开关">🔊</button>
+    </div>
+  </header>
+
+  <div class="settings">
+    <div class="seg" id="levelSeg" role="group" aria-label="难度">
+      <button data-level="easy">简单<small>4×4</small></button>
+      <button data-level="mid">进阶<small>4×4</small></button>
+      <button data-level="hard">挑战<small>6×6</small></button>
+    </div>
+    <div class="seg" id="themeSeg" role="group" aria-label="图案">
+      <button data-theme-key="animal">🐶<small>动物</small></button>
+      <button data-theme-key="fruit">🍎<small>水果</small></button>
+      <button data-theme-key="number">123<small>数字</small></button>
+    </div>
+  </div>
+
+  <div class="guide" aria-live="polite">
+    <div class="owl" id="owl" aria-hidden="true">🦉</div>
+    <div class="bubble" id="bubble">点一个<b>空格子</b>，再从下面选一个放进去吧！</div>
+  </div>
+
+  <div class="board-wrap"><div class="board" id="board" role="grid" aria-label="数独棋盘"></div></div>
+
+  <div class="picker" id="picker" aria-label="选择要放的图案"></div>
+
+  <div class="actions">
+    <button class="btn" id="hintBtn">💡 提示一下</button>
+    <button class="btn primary" id="newBtn">🔄 换一局</button>
+  </div>
+
+  <section class="rules">
+    <h2>怎么玩？</h2>
+    <ol>
+      <li><b>横着</b>的一行里，每个图案只能出现一次。</li>
+      <li><b>竖着</b>的一列里，每个图案只能出现一次。</li>
+      <li>同一个<b>颜色小方块</b>里，每个图案也只能出现一次。</li>
+    </ol>
+    <p>小窍门：先找快填满的一行，看看还缺谁！下面按钮上的小圆点，表示这个图案还剩几个没放。</p>
+  </section>
+</div>
+
+<div class="overlay" id="overlay" hidden>
+  <div class="win" role="dialog" aria-modal="true" aria-labelledby="winTitle">
+    <h2 id="winTitle">太棒啦！</h2>
+    <div class="stars" id="stars"><span>⭐</span><span>⭐</span><span>⭐</span></div>
+    <p id="winText">你把所有格子都填对了！</p>
+    <button class="btn primary" id="againBtn" style="width:100%">再玩一局</button>
+  </div>
+</div>
+<canvas id="confetti" hidden></canvas>
+
+<script>
+(() => {
+  const THEMES = {
+    animal: { name: '小动物', items: ['🐶', '🐱', '🐰', '🐼', '🐸', '🐯'], says: ['小狗', '小猫', '小兔', '熊猫', '青蛙', '老虎'] },
+    fruit:  { name: '水果',   items: ['🍎', '🍌', '🍇', '🍓', '🍊', '🍉'], says: ['苹果', '香蕉', '葡萄', '草莓', '橘子', '西瓜'] },
+    number: { name: '数字',   items: ['1', '2', '3', '4', '5', '6'],       says: ['1', '2', '3', '4', '5', '6'] },
+  };
+  const LEVELS = {
+    easy: { n: 4, bh: 2, bw: 2, blanks: 5 },
+    mid:  { n: 4, bh: 2, bw: 2, blanks: 9 },
+    hard: { n: 6, bh: 2, bw: 3, blanks: 16 },
+  };
+  const CHEERS = ['真棒！', '答对啦！', '好厉害！', '没错！', '你真聪明！', '继续加油！'];
+
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem('kidsudoku.' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem('kidsudoku.' + k, JSON.stringify(v)); } catch (e) {} },
+  };
+
+  const $ = id => document.getElementById(id);
+  const boardEl = $('board'), pickerEl = $('picker'), bubbleEl = $('bubble'), owlEl = $('owl');
+
+  let levelKey = store.get('level', 'easy');
+  let themeKey = store.get('theme', 'animal');
+  let soundOn = store.get('sound', true);
+  let trophies = store.get('trophies', 0);
+  if (!LEVELS[levelKey]) levelKey = 'easy';
+  if (!THEMES[themeKey]) themeKey = 'animal';
+
+  let L, solution, grid, given, mine, sel = -1, mistakes = 0, hints = 0, locked = false, finished = false;
+
+  // ---------- puzzle generation ----------
+  const rand = n => Math.floor(Math.random() * n);
+  const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = rand(i + 1); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  const range = n => [...Array(n).keys()];
+
+  function makeSolution({ n, bh, bw }) {
+    const base = range(n).map(r => range(n).map(c => (r * bw + Math.floor(r / bh) + c) % n));
+    const rowOrder = shuffle(range(n / bh)).flatMap(b => shuffle(range(bh)).map(i => b * bh + i));
+    const colOrder = shuffle(range(n / bw)).flatMap(s => shuffle(range(bw)).map(i => s * bw + i));
+    const sym = shuffle(range(n));
+    let g = rowOrder.map(r => colOrder.map(c => sym[base[r][c]]));
+    if (bh === bw && Math.random() < .5) g = g[0].map((_, c) => g.map(row => row[c]));
+    return g.flat();
+  }
+
+  function canPlace(cells, i, v, { n, bh, bw }) {
+    const r = Math.floor(i / n), c = i % n;
+    for (let k = 0; k < n; k++) {
+      if (cells[r * n + k] === v && r * n + k !== i) return false;
+      if (cells[k * n + c] === v && k * n + c !== i) return false;
+    }
+    const r0 = r - r % bh, c0 = c - c % bw;
+    for (let rr = r0; rr < r0 + bh; rr++)
+      for (let cc = c0; cc < c0 + bw; cc++) {
+        const j = rr * n + cc;
+        if (j !== i && cells[j] === v) return false;
+      }
+    return true;
+  }
+
+  function countSolutions(cells, lv, limit = 2) {
+    let count = 0;
+    const g = cells.slice();
+    (function rec() {
+      if (count >= limit) return;
+      const i = g.indexOf(-1);
+      if (i < 0) { count++; return; }
+      for (let v = 0; v < lv.n; v++) {
+        if (canPlace(g, i, v, lv)) { g[i] = v; rec(); g[i] = -1; if (count >= limit) return; }
+      }
+    })();
+    return count;
+  }
+
+  function makePuzzle(lv) {
+    const sol = makeSolution(lv);
+    const p = sol.slice();
+    let removed = 0;
+    for (const i of shuffle(range(lv.n * lv.n))) {
+      if (removed >= lv.blanks) break;
+      const keep = p[i];
+      p[i] = -1;
+      if (countSolutions(p, lv) === 1) removed++; else p[i] = keep;
+    }
+    return { sol, p };
+  }
+
+  // ---------- sound & voice ----------
+  let actx = null;
+  function tone(freqs, dur = .12, type = 'sine', vol = .18) {
+    if (!soundOn) return;
+    try {
+      actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+      if (actx.state === 'suspended') actx.resume();
+      freqs.forEach((f, k) => {
+        const o = actx.createOscillator(), gn = actx.createGain();
+        const t = actx.currentTime + k * dur;
+        o.type = type; o.frequency.value = f;
+        gn.gain.setValueAtTime(0, t);
+        gn.gain.linearRampToValueAtTime(vol, t + .015);
+        gn.gain.exponentialRampToValueAtTime(.001, t + dur * 1.6);
+        o.connect(gn).connect(actx.destination);
+        o.start(t); o.stop(t + dur * 1.7);
+      });
+    } catch (e) {}
+  }
+  const sfx = {
+    tap: () => tone([660], .06, 'triangle', .1),
+    good: () => tone([784, 1047], .1, 'triangle'),
+    bad: () => tone([300, 220], .13, 'square', .07),
+    hint: () => tone([988, 1319, 1568], .08, 'sine', .14),
+    win: () => tone([523, 659, 784, 1047, 784, 1047], .13, 'triangle', .2),
+  };
+  function speak(text) {
+    if (!soundOn || !('speechSynthesis' in window)) return;
+    try {
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text.replace(/<[^>]+>/g, ''));
+      u.lang = 'zh-CN'; u.rate = 1; u.pitch = 1.25;
+      speechSynthesis.speak(u);
+    } catch (e) {}
+  }
+
+  function say(html, { voice = false, hop = true } = {}) {
+    bubbleEl.innerHTML = html;
+    if (hop) { owlEl.classList.remove('hop'); void owlEl.offsetWidth; owlEl.classList.add('hop'); }
+    if (voice) speak(bubbleEl.textContent);
+  }
+
+  // ---------- rendering ----------
+  const T = () => THEMES[themeKey];
+  function symHTML(v) {
+    const t = T();
+    const cls = themeKey === 'number' ? ` num${v + 1}` : '';
+    return `<span class="sym${cls}">${t.items[v]}</span>`;
+  }
+  const label = v => themeKey === 'number' ? `数字${v + 1}` : T().says[v];
+
+  function buildBoard() {
+    const { n, bh, bw } = L;
+    boardEl.className = 'board n' + n;
+    boardEl.style.gridTemplateColumns = `repeat(${n / bw}, 1fr)`;
+    boardEl.style.gridTemplateRows = `repeat(${n / bh}, 1fr)`;
+    boardEl.innerHTML = '';
+    const boxCols = n / bw;
+    for (let b = 0; b < n; b++) {
+      const br = Math.floor(b / boxCols), bc = b % boxCols;
+      const box = document.createElement('div');
+      box.className = 'box c' + (b % 4 + 1);
+      box.style.gridTemplateColumns = `repeat(${bw}, 1fr)`;
+      box.style.gridTemplateRows = `repeat(${bh}, 1fr)`;
+      for (let k = 0; k < n; k++) {
+        const r = br * bh + Math.floor(k / bw), c = bc * bw + (k % bw);
+        const i = r * n + c;
+        const cell = document.createElement('button');
+        cell.className = 'cell';
+        cell.dataset.i = i;
+        cell.setAttribute('role', 'gridcell');
+        cell.addEventListener('click', () => selectCell(i));
+        box.appendChild(cell);
+      }
+      boardEl.appendChild(box);
+    }
+  }
+  const cellEl = i => boardEl.querySelector(`.cell[data-i="${i}"]`);
+
+  function paint() {
+    const { n, bh, bw } = L;
+    const sr = sel >= 0 ? Math.floor(sel / n) : -1, sc = sel >= 0 ? sel % n : -1;
+    const sv = sel >= 0 ? grid[sel] : -1;
+    for (let i = 0; i < n * n; i++) {
+      const el = cellEl(i), r = Math.floor(i / n), c = i % n, v = grid[i];
+      const sameBox = sel >= 0 && Math.floor(r / bh) === Math.floor(sr / bh) && Math.floor(c / bw) === Math.floor(sc / bw);
+      el.classList.toggle('given', given[i]);
+      el.classList.toggle('mine', mine[i]);
+      el.classList.toggle('empty', v < 0);
+      el.classList.toggle('sel', i === sel);
+      el.classList.toggle('peer', i !== sel && sel >= 0 && (r === sr || c === sc || sameBox) && !(sv >= 0 && v === sv));
+      el.classList.toggle('same', i !== sel && sv >= 0 && v === sv);
+      const want = v < 0 ? '' : symHTML(v);
+      if (el.dataset.v !== String(v)) { el.innerHTML = want; el.dataset.v = v; }
+      const rc = `第${r + 1}行第${c + 1}列`;
+      el.setAttribute('aria-label', v < 0 ? rc + '，空格' : rc + '，' + label(v));
+    }
+    paintPicker();
+  }
+
+  function paintPicker() {
+    const { n } = L;
+    pickerEl.className = 'picker n' + n;
+    if (pickerEl.children.length !== n || pickerEl.dataset.theme !== themeKey) {
+      pickerEl.innerHTML = '';
+      pickerEl.dataset.theme = themeKey;
+      for (let v = 0; v < n; v++) {
+        const b = document.createElement('button');
+        b.className = 'pick';
+        b.dataset.v = v;
+        b.innerHTML = symHTML(v) + '<span class="dots"></span>';
+        b.addEventListener('click', () => place(v));
+        pickerEl.appendChild(b);
+      }
+    }
+    [...pickerEl.children].forEach((b, v) => {
+      const left = n - grid.filter(x => x === v).length;
+      b.classList.toggle('done', left === 0);
+      b.querySelector('.dots').innerHTML = '<i></i>'.repeat(left);
+      b.setAttribute('aria-label', `${label(v)}，还剩${left}个`);
+    });
+  }
+
+  // ---------- game flow ----------
+  function newGame() {
+    L = LEVELS[levelKey];
+    const { sol, p } = makePuzzle(L);
+    solution = sol; grid = p;
+    given = p.map(v => v >= 0);
+    mine = p.map(() => false);
+    sel = grid.indexOf(-1);
+    mistakes = 0; hints = 0; locked = false; finished = false;
+    buildBoard();
+    pickerEl.innerHTML = '';
+    paint();
+    const blanks = grid.filter(v => v < 0).length;
+    say(`新的一局！有 <b>${blanks}</b> 个空格子等你来填。点一个空格，再从下面选${T().name}吧！`);
+    $('overlay').hidden = true;
+    $('confetti').hidden = true;
+  }
+
+  function selectCell(i) {
+    if (locked || finished) return;
+    sfx.tap();
+    sel = i;
+    paint();
+    if (given[i]) {
+      say(`这个${label(grid[i])}是题目给的，不能改哦。`, { hop: false });
+    }
+  }
+
+  function findClash(i, v) {
+    const { n, bh, bw } = L;
+    const r = Math.floor(i / n), c = i % n;
+    for (let k = 0; k < n; k++) if (k !== c && grid[r * n + k] === v) return { j: r * n + k, where: '这一横行' };
+    for (let k = 0; k < n; k++) if (k !== r && grid[k * n + c] === v) return { j: k * n + c, where: '这一竖列' };
+    const r0 = r - r % bh, c0 = c - c % bw;
+    for (let rr = r0; rr < r0 + bh; rr++)
+      for (let cc = c0; cc < c0 + bw; cc++) {
+        const j = rr * n + cc;
+        if (j !== i && grid[j] === v) return { j, where: '这个颜色方块' };
+      }
+    return null;
+  }
+
+  function place(v) {
+    if (locked || finished) return;
+    if (sel < 0 || grid[sel] >= 0) {
+      const next = grid.indexOf(-1);
+      if (sel >= 0 && given[sel]) { say('先点一个<b>空格子</b>，再选图案哦！'); return; }
+      if (sel >= 0 && grid[sel] >= 0) { say('这个格子已经填好啦，换一个<b>空格子</b>吧！'); return; }
+      if (next < 0) return;
+      sel = next;
+    }
+    const i = sel, el = cellEl(i);
+    if (solution[i] === v) {
+      grid[i] = v; mine[i] = true;
+      sfx.good();
+      paint();
+      el.classList.remove('pop'); void el.offsetWidth; el.classList.add('pop');
+      if (grid.indexOf(-1) < 0) return win();
+      const cheer = CHEERS[rand(CHEERS.length)];
+      say(`${cheer}${themeKey === 'number' ? '' : '放好了' + label(v) + '。'}`, { voice: true });
+      return;
+    }
+    // wrong answer: show it briefly, explain gently, then take it back
+    mistakes++;
+    locked = true;
+    sfx.bad();
+    el.innerHTML = symHTML(v); el.dataset.v = 'x';
+    el.classList.remove('empty');
+    el.classList.add('wrong');
+    const clash = findClash(i, v);
+    if (clash) {
+      const ce = cellEl(clash.j);
+      ce.classList.remove('clash'); void ce.offsetWidth; ce.classList.add('clash');
+      say(`哎呀，${clash.where}里已经有<b>${label(v)}</b>啦！换一个试试。`, { voice: true });
+    } else {
+      say(`嗯…放<b>${label(v)}</b>的话，后面会走不通哦。再想一想？`, { voice: true });
+    }
+    setTimeout(() => {
+      el.classList.remove('wrong');
+      locked = false;
+      paint();
+    }, 900);
+  }
+
+  function hint() {
+    if (locked || finished) return;
+    let i = sel;
+    if (i < 0 || grid[i] >= 0) {
+      // pick the empty cell with the fewest possibilities — the easiest one to learn from
+      let best = -1, bestCount = 99;
+      grid.forEach((x, j) => {
+        if (x >= 0) return;
+        const cnt = range(L.n).filter(v => canPlace(grid, j, v, L)).length;
+        if (cnt < bestCount) { bestCount = cnt; best = j; }
+      });
+      i = best;
+    }
+    if (i < 0) return;
+    hints++;
+    sel = i;
+    grid[i] = solution[i]; mine[i] = true;
+    sfx.hint();
+    paint();
+    const el = cellEl(i);
+    el.classList.remove('hinted'); void el.offsetWidth; el.classList.add('hinted', 'pop');
+    if (grid.indexOf(-1) < 0) return win();
+    const r = Math.floor(i / L.n) + 1, c = i % L.n + 1;
+    say(`第 ${r} 行、第 ${c} 列应该放<b>${label(solution[i])}</b>。看看这一行，是不是就缺它？`, { voice: true });
+  }
+
+  function win() {
+    finished = true;
+    sel = -1;
+    paint();
+    const slips = mistakes + hints;
+    const stars = slips === 0 ? 3 : slips <= 2 ? 2 : 1;
+    trophies++;
+    store.set('trophies', trophies);
+    $('trophies').textContent = trophies;
+    [...$('stars').children].forEach((s, k) => s.classList.toggle('on', k < stars));
+    $('winText').textContent = stars === 3
+      ? '一次都没错，你是数独小高手！'
+      : stars === 2 ? '只错了一点点，真厉害！' : '坚持到最后，你很棒！下次争取更多星星！';
+    say('全部填对啦！你真了不起！', { voice: true });
+    setTimeout(() => { sfx.win(); $('overlay').hidden = false; confetti(); $('againBtn').focus(); }, 450);
+  }
+
+  function confetti() {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const cv = $('confetti'), ctx = cv.getContext('2d');
+    cv.hidden = false;
+    const dpr = window.devicePixelRatio || 1;
+    cv.width = innerWidth * dpr; cv.height = innerHeight * dpr;
+    ctx.scale(dpr, dpr);
+    const css = getComputedStyle(document.documentElement);
+    const colors = ['--accent', '--sun', '--good', '--n2', '--n5', '--n6'].map(k => css.getPropertyValue(k).trim());
+    const parts = range(140).map(() => ({
+      x: innerWidth / 2 + (Math.random() - .5) * 80, y: innerHeight * .35,
+      vx: (Math.random() - .5) * 12, vy: -Math.random() * 12 - 4,
+      s: 6 + Math.random() * 6, rot: Math.random() * 6, vr: (Math.random() - .5) * .3,
+      col: colors[rand(colors.length)],
+    }));
+    let frames = 0;
+    (function step() {
+      ctx.clearRect(0, 0, innerWidth, innerHeight);
+      parts.forEach(p => {
+        p.vy += .32; p.x += p.vx; p.y += p.vy; p.vx *= .99; p.rot += p.vr;
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+        ctx.fillStyle = p.col; ctx.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2);
+        ctx.restore();
+      });
+      if (++frames < 200) requestAnimationFrame(step); else cv.hidden = true;
+    })();
+  }
+
+  // ---------- controls ----------
+  function syncSeg() {
+    document.querySelectorAll('#levelSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.level === levelKey));
+    document.querySelectorAll('#themeSeg button').forEach(b => b.setAttribute('aria-pressed', b.dataset.themeKey === themeKey));
+    $('soundBtn').textContent = soundOn ? '🔊' : '🔇';
+    $('soundBtn').setAttribute('aria-pressed', soundOn);
+  }
+  $('levelSeg').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    levelKey = b.dataset.level; store.set('level', levelKey); syncSeg(); newGame();
+  });
+  $('themeSeg').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    themeKey = b.dataset.themeKey; store.set('theme', themeKey); syncSeg();
+    boardEl.querySelectorAll('.cell').forEach(c => { c.dataset.v = ''; });
+    paint();
+    say(`换成<b>${T().name}</b>啦！规则一样哦。`);
+  });
+  $('soundBtn').addEventListener('click', () => {
+    soundOn = !soundOn; store.set('sound', soundOn); syncSeg();
+    if (!soundOn && 'speechSynthesis' in window) speechSynthesis.cancel();
+    sfx.tap();
+  });
+  $('hintBtn').addEventListener('click', hint);
+  $('newBtn').addEventListener('click', newGame);
+  $('againBtn').addEventListener('click', newGame);
+
+  document.addEventListener('keydown', e => {
+    if (!L || finished) { if (e.key === 'Enter' && finished) newGame(); return; }
+    const n = L.n;
+    const num = parseInt(e.key, 10);
+    if (num >= 1 && num <= n) { place(num - 1); e.preventDefault(); return; }
+    const mv = { ArrowUp: -n, ArrowDown: n, ArrowLeft: -1, ArrowRight: 1 }[e.key];
+    if (mv !== undefined) {
+      e.preventDefault();
+      if (sel < 0) sel = 0;
+      const r = Math.floor(sel / n), c = sel % n;
+      if ((e.key === 'ArrowLeft' && c === 0) || (e.key === 'ArrowRight' && c === n - 1)) return;
+      const nx = sel + mv;
+      if (nx >= 0 && nx < n * n) { sel = nx; paint(); cellEl(sel).focus(); }
+    }
+  });
+
+  $('trophies').textContent = trophies;
+  syncSeg();
+  newGame();
+})();
+</script>
+
+</html>
